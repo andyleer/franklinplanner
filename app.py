@@ -1,17 +1,18 @@
-# app.py – Franklin Planner (Left Page Only, Compact, 6 Preloaded Tasks + Inline Add)
+# app.py – Franklin Planner Left Page (CSS Grid + Mini Calendars, fully editable)
 
 import streamlit as st
 import datetime as dt
 import json
 import sqlite3
 from pathlib import Path
+import calendar
 
 st.set_page_config(page_title="Franklin Daily Planner", page_icon="📘", layout="wide")
 
-INK  = "#0b6b6c"
-PAPER= "#f8fbfa"
+INK = "#0b6b6c"
+PAPER = "#f8fbfa"
 RULE = "#9bc7c3"
-LINES= "#d8ebe9"
+LINES = "#d8ebe9"
 
 # ---------- STYLE ----------
 st.markdown(f"""
@@ -26,7 +27,17 @@ html, body, .block-container {{
   line-height: 1.25em;
 }}
 * {{ color-scheme: only light; }}
-.block-container {{ padding-top: .5rem; max-width: 780px; }}
+.block-container {{
+  padding-top: .5rem;
+  max-width: 760px;
+}}
+
+h3.date-header {{
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: {INK};
+  margin-bottom: .2rem;
+}}
 
 .section {{
   border: 1px solid {RULE};
@@ -35,6 +46,7 @@ html, body, .block-container {{
   padding: .3rem .5rem;
   margin-bottom: .4rem;
 }}
+
 .section-title {{
   font-variant-caps: small-caps;
   font-size: .85rem;
@@ -46,6 +58,7 @@ html, body, .block-container {{
   justify-content: space-between;
   align-items: center;
 }}
+
 .add-btn {{
   background: none;
   border: none;
@@ -55,13 +68,56 @@ html, body, .block-container {{
 }}
 .add-btn:hover {{ color: #058; }}
 
+/* ---- Mini calendars ---- */
+.calrow {{
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin-bottom: .3rem;
+  gap: 10px;
+}}
+.calbox {{
+  flex: 0 0 30%;
+  max-width: 30%;
+  border: 1px solid {RULE};
+  border-radius: 6px;
+  padding: .15rem .2rem .25rem;
+  background: white;
+}}
+.calcap {{
+  font-size: .68rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 2px;
+}}
+.calgrid {{
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+}}
+.calgrid div {{
+  text-align: center;
+  font-size: .58rem;
+  padding: 1px 0;
+}}
+.calhdr {{ font-weight: 700; background: #eef6f5; }}
+.today {{ outline: 1px solid {INK}; border-radius: 2px; }}
+
+/* ---- Schedule ---- */
 .schedule-row {{
   display: grid;
   grid-template-columns: 48px 1fr;
   align-items: center;
   border-bottom: 1px solid {LINES};
 }}
-.timecell {{ font-weight: 700; font-size: .85rem; color: {INK}; }}
+.timecell {{
+  font-weight: 700;
+  font-size: .85rem;
+  color: {INK};
+  padding-right: .2rem;
+  text-align: right;
+}}
 
 .stTextInput > div > div > input {{
   font-size: .85rem;
@@ -69,6 +125,7 @@ html, body, .block-container {{
 }}
 </style>
 """, unsafe_allow_html=True)
+
 
 # ---------- DB ----------
 DB = Path("planner.db")
@@ -90,7 +147,6 @@ def normalize(entry: dict) -> dict:
         t.setdefault("t", "")
         t.setdefault("done", False)
         tasks.append(t)
-    # pad to 6 blank tasks
     while len(tasks) < 6:
         tasks.append({"p": "A", "t": "", "done": False})
     entry["tasks"] = tasks
@@ -113,12 +169,18 @@ def save_day(d, data):
     c.execute("REPLACE INTO planner (date, data) VALUES (?,?)", (str(d), json.dumps(normalize(data))))
     conn.commit()
 
-def day_stamp(d):
-    doy = d.timetuple().tm_yday
-    total = 366 if (d.year % 4 == 0 and (d.year % 100 != 0 or d.year % 400 == 0)) else 365
-    left = total - doy
-    week = d.isocalendar().week
-    return f"{doy}th Day • {left} Left • Week {week}"
+def render_calendar(target, today):
+    _, num_days = calendar.monthrange(target.year, target.month)
+    first_day = dt.date(target.year, target.month, 1).weekday()
+    st.markdown(f'<div class="calbox"><div class="calcap">{target.strftime("%B %Y")}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="calgrid">' + "".join(f'<div class="calhdr">{d}</div>' for d in ["S","M","T","W","T","F","S"]) + '</div>', unsafe_allow_html=True)
+    html = '<div class="calgrid">'
+    html += "".join('<div></div>' for _ in range((first_day + 1) % 7))
+    for day in range(1, num_days + 1):
+        cls = "today" if (target.year, target.month, day) == (today.year, today.month, today.day) else ""
+        html += f'<div class="{cls}">{day}</div>'
+    html += "</div></div>"
+    st.markdown(html, unsafe_allow_html=True)
 
 # ---------- PAGE ----------
 today = dt.date.today()
@@ -126,10 +188,17 @@ date = st.date_input("", today, format="YYYY-MM-DD")
 stored = load_day(date)
 
 # Header
-st.markdown(f"### {date.strftime('%A, %B %d, %Y')}")
-st.markdown(f"<div style='text-align:right;font-weight:700'>{day_stamp(date)}</div>", unsafe_allow_html=True)
+st.markdown(f"<h3 class='date-header'>{date.strftime('%A, %B %d, %Y')}</h3>", unsafe_allow_html=True)
 
-# ---------- ABC TASK LIST ----------
+# Mini calendars: previous, current, next
+st.markdown('<div class="calrow">', unsafe_allow_html=True)
+prev = (date.replace(day=1) - dt.timedelta(days=1)).replace(day=1)
+next_ = (date.replace(day=28) + dt.timedelta(days=10)).replace(day=1)
+for d in [prev, date.replace(day=1), next_]:
+    render_calendar(d, date)
+st.markdown('</div>', unsafe_allow_html=True)
+
+# ABC Prioritized Daily Task List
 col_header = st.columns([0.9, 0.1])
 with col_header[0]:
     st.markdown('<div class="section-title">ABC Prioritized Daily Task List</div>', unsafe_allow_html=True)
@@ -146,7 +215,7 @@ for i, t in enumerate(stored["tasks"]):
     if done != t.get("done", False):
         t["done"] = done
         save_day(date, stored)
-    pval = cols[1].selectbox("", ["A", "B", "C"], key=f"pri{i}", index=["A","B","C"].index(t.get("p","A")), label_visibility="collapsed")
+    pval = cols[1].selectbox("", ["A", "B", "C"], key=f"pri{i}", index=["A", "B", "C"].index(t.get("p", "A")), label_visibility="collapsed")
     if pval != t.get("p", "A"):
         t["p"] = pval
         save_day(date, stored)
@@ -160,7 +229,7 @@ for i, t in enumerate(stored["tasks"]):
         st.rerun()
 st.markdown('</div>', unsafe_allow_html=True)
 
-# ---------- DAILY TRACKER ----------
+# Daily Tracker
 st.markdown('<div class="section"><div class="section-title">Daily Tracker</div>', unsafe_allow_html=True)
 for i in range(1, 9):
     rr = st.columns([0.06, 0.94])
@@ -168,25 +237,24 @@ for i in range(1, 9):
     stored["tracker"][str(i)] = rr[1].text_input(f"trk{i}", value=stored["tracker"].get(str(i), ""), label_visibility="collapsed")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# ---------- APPOINTMENT SCHEDULE ----------
+# Appointment Schedule
 st.markdown('<div class="section"><div class="section-title">Appointment Schedule</div>', unsafe_allow_html=True)
-for h in range(6, 23):
-    hh = f"{h:02d}:00"
+for h in range(8, 18):
+    hh = f"{h}:00"
     st.markdown('<div class="schedule-row">', unsafe_allow_html=True)
     st.markdown(f'<div class="timecell">{hh}</div>', unsafe_allow_html=True)
     stored["sched"][hh] = st.text_input("", value=stored["sched"].get(hh, ""), key=f"s{hh}", label_visibility="collapsed")
     st.markdown('</div>', unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
-# ---------- SAVE BAR ----------
+# Save Bar
 cols = st.columns([0.2, 0.6, 0.2])
 if cols[0].button("💾 Save", use_container_width=True):
     save_day(date, stored)
     st.success("Saved ✔")
 if cols[2].button("🗑 Clear", use_container_width=True):
-    stored = {"tasks": [{"p": "A", "t": "", "done": False} for _ in range(6)],
-              "tracker": {str(i): "" for i in range(1, 9)}, "sched": {}}
+    stored = {"tasks": [{"p": "A", "t": "", "done": False} for _ in range(6)], "tracker": {str(i): "" for i in range(1, 9)}, "sched": {}}
     save_day(date, stored)
     st.rerun()
 
-st.caption("Franklin Daily Planner • Compact Left Page • 6 Preloaded Tasks + Inline Add")
+st.caption("Franklin Daily Planner • Left Page • CSS Grid + Mini Calendars (Teal Theme)")
