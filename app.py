@@ -1,10 +1,12 @@
+# app.py — Franklin Two-Page Daily (compact, mobile-friendly, Outlook-aware)
+
 import streamlit as st
 import datetime as dt
 import json
 import sqlite3
 from pathlib import Path
 
-# Optional Outlook integration
+# ---- Optional Outlook integration (Microsoft Graph via O365) ----
 USE_OUTLOOK = True
 try:
     from O365 import Account, FileSystemTokenBackend
@@ -16,13 +18,16 @@ st.set_page_config(page_title="Franklin Two-Page Daily", page_icon="📘", layou
 
 # ---------------- Theme / CSS ----------------
 FRANKLIN_TEAL = "#0b6b6c"      # ink
-PAPER = "#f6faf8"              # paper
-LINES = "#cfe5e2"              # ruled lines
-RULE = "#8ec1bc"               # section headings / thin rules
-ACCENT_BG = "#e9f4f2"          # light boxes
+PAPER = "#f7fbfa"              # paper
+LINES = "#d7ece9"              # ruled lines
+RULE = "#99cfc9"               # section headings / thin rules
+ACCENT_BG = "#eef7f6"          # light boxes
 
+# Always light: override dark tokens with light colors
 st.markdown(f"""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&display=swap');
+
 :root {{
   --ink: {FRANKLIN_TEAL};
   --paper: {PAPER};
@@ -30,89 +35,117 @@ st.markdown(f"""
   --rule: {RULE};
   --accent: {ACCENT_BG};
 }}
-/* Paper background + tighter layout */
+
+/* Base + light mode lock */
 html, body, .block-container {{
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--paper) !important;
+  color: var(--ink) !important;
 }}
+* {{ color-scheme: only light; }}
+
 .block-container {{
-  padding-top: .75rem;
+  padding-top: .5rem;
   padding-bottom: .25rem;
-  max-width: 1400px;
+  max-width: 1200px;
+  font-family: "Libre Baskerville", Georgia, serif;
 }}
-/* Franklin typography feel */
-h1, h2, h3, h4, h5 {{
+h1,h2,h3,h4,h5,h6 {{
   color: var(--ink) !important;
-  font-family: "Georgia", "Times New Roman", serif;
-  letter-spacing: .2px;
+  margin: .25rem 0 .35rem;
+  letter-spacing:.2px;
 }}
-/* Compact inputs */
-.stTextInput > div > div > input,
-.stTextArea textarea {{
-  font-size: 0.95rem;
-  color: var(--ink) !important;
-  background: white !important;
+
+/* Two-page grid that collapses on narrow screens */
+.page-grid {{
+  display: grid;
+  grid-template-columns: 58% 42%;
+  grid-column-gap: 14px;
 }}
-/* Lined sections via repeating gradient */
-.lined {{
-  background-image: repeating-linear-gradient(
-    to bottom,
-    white 0px, white 24px,
-    var(--lines) 24px, var(--lines) 25px
-  );
-  border: 1px solid var(--rule);
-  border-radius: 8px;
-  padding: .5rem .75rem;
+@media (max-width: 980px) {{
+  .page-grid {{ grid-template-columns: 1fr; }}
 }}
-/* Headed boxes to mimic section labels */
+
+/* Section cards */
 .section {{
   border: 1px solid var(--rule);
   border-radius: 10px;
-  padding: .4rem .6rem .6rem .6rem;
   background: white;
+  padding: .36rem .5rem .5rem;
+  margin-bottom: .5rem;
 }}
 .section-title {{
   font-variant-caps: small-caps;
   font-weight: 700;
-  font-size: .95rem;
+  font-size: .92rem;
   color: var(--ink);
   margin-bottom: .25rem;
   border-bottom: 1px solid var(--rule);
   padding-bottom: .15rem;
 }}
-/* Tiny calendar grid */
-.calgrid {{
-  display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
-  font-size: .75rem;
+
+/* Very compact inputs */
+.stTextInput > div > div > input,
+.stTextArea textarea {{
+  font-size: .92rem;
+  color: var(--ink) !important;
+  background: white !important;
+  padding: .35rem .45rem;
 }}
-.calgrid div {{
-  text-align:center; padding: 2px 0; color: var(--ink);
+.stCheckbox label {{ font-size: .92rem; }}
+
+/* Lined paper effect */
+.lined {{
+  background-image: repeating-linear-gradient(
+    to bottom,
+    white 0px, white 21px,
+    var(--lines) 21px, var(--lines) 22px
+  );
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: .5rem .6rem;
 }}
-.calhdr {{ font-weight:700; background: var(--accent); }}
-.today {{ outline: 2px solid var(--ink); border-radius: 3px; }}
-/* Super compact checkboxes and buttons */
-.stCheckbox label {{ font-size: .95rem; color: var(--ink); }}
-button[kind="secondary"] {{ color: var(--ink); }}
-/* Shrink default Streamlit spacing inside columns */
-.css-1dp5vir, .css-1r6slb0, .css-12w0qpk {{
-  margin-top: .35rem; margin-bottom: .15rem;
-}}
-/* Schedule row lines (narrow, ruled) */
-.schedule-row {{
-  display: grid; grid-template-columns: 54px 1fr; align-items:center;
-  gap: .5rem; padding: 2px 0; border-bottom: 1px solid var(--lines);
-}}
-.timecell {{
-  font-weight:700; font-size:.9rem; color: var(--ink);
-}}
-/* Tabs-like month rail (visual only) */
-.monthrail {{
-  display:flex; gap: 6px; flex-wrap: wrap; margin-bottom: .35rem;
-}}
+
+/* Month tabs (visual) */
+.monthrail {{ display:flex; gap:6px; flex-wrap:wrap; margin: .25rem 0 .1rem; }}
 .monthpill {{
-  border:1px solid var(--rule); border-radius: 999px; padding: 2px 8px;
-  font-size: .70rem; color: var(--ink); background: var(--accent);
+  border:1px solid var(--rule); border-radius: 999px; padding: 1px 8px;
+  font-size: .68rem; background: var(--accent); color: var(--ink);
 }}
+
+/* Mini calendars: extra small */
+.calwrap {{ display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; }}
+@media (max-width: 980px) {{
+  .calwrap {{ grid-template-columns: repeat(3, 1fr); }}
+}}
+.calbox {{ border:1px solid var(--rule); border-radius:8px; background:white; padding:.25rem .3rem; }}
+.calcap {{ font-weight:700; font-size:.75rem; margin-bottom:2px; }}
+.calgrid {{ display:grid; grid-template-columns: repeat(7, 1fr); gap:1px; }}
+.calgrid div {{ text-align:center; padding:1px 0; font-size:.64rem; color:var(--ink); }}
+.calhdr {{ font-weight:700; background: var(--accent); }}
+.today {{ outline: 1.5px solid var(--ink); border-radius: 3px; }}
+
+/* Schedule compact rows */
+.schedule-row {{
+  display:grid; grid-template-columns: 50px 1fr; align-items:center;
+  gap:.4rem; padding: 1px 0; border-bottom: 1px solid var(--lines);
+}}
+.timecell {{ font-weight:700; font-size:.9rem; }}
+
+/* Gutter binder-hole dots (decorative) */
+.gutter {{
+  display:flex; flex-direction:column; align-items:center;
+  gap:16px; margin: 6px 0; opacity:.5;
+}}
+.hole {{
+  width:8px; height:8px; border-radius:50%;
+  background: var(--rule);
+}}
+@media (max-width: 980px) {{
+  .gutter {{ display:none; }}
+}}
+
+/* Tighten Streamlit internal spacing a bit */
+div[data-testid="stHorizontalBlock"] > div {{ margin-bottom: .35rem; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -151,7 +184,6 @@ def get_outlook_events(selected_date: dt.date):
         client_id = st.secrets.get("client_id")
         client_secret = st.secrets.get("client_secret")
         tenant_id = st.secrets.get("tenant_id", "organizations")
-
         if not client_id or not client_secret:
             return []
 
@@ -159,20 +191,19 @@ def get_outlook_events(selected_date: dt.date):
         token_backend = FileSystemTokenBackend(token_path='.', token_filename='o365_token.txt')
         account = Account(credentials, token_backend=token_backend, tenant_id=tenant_id)
 
-        # Button-driven auth (first time)
         if not account.is_authenticated:
-            st.button("Connect Outlook", key="connect", help="Authorize Microsoft 365 to read your calendar")
-            st.info("Click **Connect Outlook** above, then come back after you grant access.")
-            account.authenticate(scopes=['offline_access', 'Calendars.Read'])
-            # Continue even on first open; if not authed yet, empty list
+            # First-time auth
+            if st.button("Connect Outlook", key="connect_outlook", help="Authorize Microsoft 365 to read your calendar"):
+                account.authenticate(scopes=['offline_access', 'Calendars.Read'])
+            # If not authorized yet, return empty
             if not account.is_authenticated:
                 return []
 
         schedule = account.schedule()
         calendar = schedule.get_default_calendar()
 
-        start = dt.datetime.combine(selected_date, dt.time(0, 0))
-        end = dt.datetime.combine(selected_date, dt.time(23, 59, 59))
+        start = dt.datetime.combine(selected_date, dt.time(0,0))
+        end = dt.datetime.combine(selected_date, dt.time(23,59,59))
         q = calendar.new_query('start').greater_equal(start)
         q.chain('and').on_attribute('end').less_equal(end)
         items = []
@@ -187,25 +218,47 @@ def get_outlook_events(selected_date: dt.date):
         return []
 
 # ---------------- Utilities ----------------
-def mini_month(d: dt.date):
-    """Return a 7xN grid for the month containing d."""
-    first = d.replace(day=1)
-    start_weekday = (first.weekday() + 1) % 7  # Monday=0 -> Sunday=0
-    days_in_month = (first.replace(month=first.month % 12 + 1, day=1) - dt.timedelta(days=1)).day
-    cells = ["Su","Mo","Tu","We","Th","Fr","Sa"] + list(range(1, days_in_month+1))
-    # pad with blanks before first day
-    blanks = [""] * start_weekday
-    return cells[:7], blanks + list(range(1, days_in_month+1))
+def month_grid(year: int, month: int):
+    first = dt.date(year, month, 1)
+    start_weekday = (first.weekday() + 1) % 7  # Sunday=0
+    # days in month
+    if month == 12:
+        next_first = dt.date(year+1, 1, 1)
+    else:
+        next_first = dt.date(year, month+1, 1)
+    dim = (next_first - dt.timedelta(days=1)).day
+    return start_weekday, dim
 
-def ruled_textarea(key, value, height=250, placeholder=""):
+def render_mini_calendar(target: dt.date, today: dt.date):
+    sw, dim = month_grid(target.year, target.month)
+    st.markdown(f'<div class="calbox"><div class="calcap">{target.strftime("%B %Y")}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="calgrid">' + "".join([f'<div class="calhdr">{h}</div>' for h in ["Su","Mo","Tu","We","Th","Fr","Sa"]]) + "</div>", unsafe_allow_html=True)
+    html = '<div class="calgrid">'
+    html += "".join('<div></div>' for _ in range(sw))
+    for dnum in range(1, dim+1):
+        cls = "today" if (target.year, target.month, dnum) == (today.year, today.month, today.day) else ""
+        html += f'<div class="{cls}">{dnum}</div>'
+    html += '</div></div>'
+    st.markdown(html, unsafe_allow_html=True)
+
+def ruled_textarea(key, value, height=420, placeholder=""):
     st.markdown(f'<div class="lined">', unsafe_allow_html=True)
     out = st.text_area(label="", key=key, value=value, height=height, placeholder=placeholder, label_visibility="collapsed")
     st.markdown(f'</div>', unsafe_allow_html=True)
     return out
 
+def year_day_stamp(d: dt.date):
+    day_of_year = d.timetuple().tm_yday
+    is_leap = (d.year % 4 == 0 and (d.year % 100 != 0 or d.year % 400 == 0))
+    total_days = 366 if is_leap else 365
+    left = total_days - day_of_year
+    week = d.isocalendar().week
+    return f"{day_of_year}th Day • {left} Left • Week {week}"
+
 # ---------------- State ----------------
 today = dt.date.today()
 date = st.date_input("Date", today, format="YYYY-MM-DD")
+
 stored = load_day(date) or {
     "quote": "",
     "notes": "",
@@ -214,54 +267,40 @@ stored = load_day(date) or {
     "manual_sched": {}  # "HH:MM" -> "desc"
 }
 
-# ---------------- Header Row ----------------
-left, right = st.columns([1.35, 1.0], gap="small")
-
-with left:
-    # Month tabs visual
-    st.markdown('<div class="monthrail">' + "".join([f'<span class="monthpill">{m}</span>' for m in
+# ---------------- Header ----------------
+st.markdown('<div class="monthrail">' + "".join([f'<span class="monthpill">{m}</span>' for m in
         ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]]) + "</div>", unsafe_allow_html=True)
+st.markdown(f"### {date.strftime('%A')} &nbsp;&nbsp; {date.strftime('%B %d, %Y')}")
 
-    st.markdown(f"### {date.strftime('%A')} &nbsp;&nbsp; {date.strftime('%B %d, %Y')}")
+# ---------------- Two-Page Layout ----------------
+st.markdown('<div class="page-grid">', unsafe_allow_html=True)
 
-    # ---------- Mini Calendars (prev/current/next) ----------
-    mc_box = st.container(border=True)
-    with mc_box:
-        c1,c2,c3 = st.columns(3)
-        for idx, target in enumerate([ (date - dt.timedelta(days=28)).replace(day=1),
-                                       date.replace(day=1),
-                                       (date + dt.timedelta(days=35)).replace(day=1) ]):
-            hdr, days = mini_month(target)
-            col = [c1,c2,c3][idx]
-            with col:
-                st.markdown(f"**{target.strftime('%B %Y')}**")
-                st.markdown('<div class="calgrid">' + "".join([f'<div class="calhdr">{h}</div>' for h in hdr]) + "</div>", unsafe_allow_html=True)
-                # render days
-                html = '<div class="calgrid">'
-                weekday = (target.weekday() + 1) % 7
-                html += "".join('<div></div>' for _ in range(weekday))
-                for dnum in range(1, (target.replace(month=target.month%12+1, day=1)-dt.timedelta(days=1)).day+1):
-                    cls = "today" if (target.year, target.month, dnum) == (date.year, date.month, date.day) else ""
-                    html += f'<div class="{cls}">{dnum}</div>'
-                html += '</div>'
-                st.markdown(html, unsafe_allow_html=True)
+# ---------- LEFT PAGE ----------
+left_col, right_col = st.columns([0.58, 0.42], gap="small")
 
-    st.markdown("")
+with left_col:
+    # Tiny three mini-calendars row
+    cwrap = st.container()
+    with cwrap:
+        st.markdown('<div class="calwrap">', unsafe_allow_html=True)
+        prev_month = (date.replace(day=1) - dt.timedelta(days=1)).replace(day=1)
+        next_month = (date.replace(day=28) + dt.timedelta(days=10)).replace(day=1)
+        for target in [prev_month, date.replace(day=1), next_month]:
+            render_mini_calendar(target, date)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # ---------- Prioritized Task List ----------
+    # ABC Prioritized Task List
     st.markdown('<div class="section"><div class="section-title">ABC Prioritized Daily Task List</div>', unsafe_allow_html=True)
 
-    # Input row
     tcols = st.columns([0.14, 0.72, 0.14])
     pri = tcols[0].selectbox("Pri", ["A","B","C"], index=0, label_visibility="collapsed")
-    txt = tcols[1].text_input("Add task", label_visibility="collapsed", placeholder="Task description…")
+    txt = tcols[1].text_input("Task", label_visibility="collapsed", placeholder="Task description…")
     add = tcols[2].button("Add", use_container_width=True)
     if add and txt.strip():
         stored["tasks"].append({"p": pri, "text": txt.strip(), "done": False})
         save_day(date, stored)
         st.rerun()
 
-    # Table-ish list
     if stored["tasks"]:
         for i, item in enumerate(stored["tasks"]):
             r = st.columns([0.08, 0.08, 0.70, 0.14], gap="small")
@@ -277,52 +316,62 @@ with left:
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ---------- Daily Tracker ----------
-    st.markdown('<div class="section" style="margin-top:.5rem;"><div class="section-title">Daily Tracker</div>', unsafe_allow_html=True)
+    # Daily Tracker
+    st.markdown('<div class="section"><div class="section-title">Daily Tracker</div>', unsafe_allow_html=True)
     for i in range(1,9):
         cc = st.columns([0.06, 0.94], gap="small")
         cc[0].markdown(f"**{i}**")
         stored["tracker"][str(i)] = cc[1].text_input(f"trk{i}", value=stored["tracker"].get(str(i), ""), label_visibility="collapsed")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ---------- Appointment Schedule ----------
-    st.markdown('<div class="section" style="margin-top:.5rem;"><div class="section-title">Appointment Schedule</div>', unsafe_allow_html=True)
-
-    # Pull Outlook events
+    # Appointment Schedule (full-hour increments)
+    st.markdown('<div class="section"><div class="section-title">Appointment Schedule</div>', unsafe_allow_html=True)
     events = get_outlook_events(date) if USE_OUTLOOK else []
     event_map = {}
     for s,e,subj,loc in events:
         key = s
         desc = subj + (f" — {loc}" if loc else "")
-        # if already has something, append
         event_map[key] = (event_map.get(key, "") + (" | " if key in event_map else "") + desc)
 
-    hours = list(range(6, 23))  # 06 to 22
+    hours = list(range(6, 23))
     for h in hours:
         hh = f"{h:02d}:00"
         display_text = event_map.get(hh, stored["manual_sched"].get(hh, ""))
-        with st.container():
-            st.markdown('<div class="schedule-row">', unsafe_allow_html=True)
-            st.markdown(f'<div class="timecell">{hh}</div>', unsafe_allow_html=True)
-            val = st.text_input(label=hh, value=display_text, key=f"s_{hh}", label_visibility="collapsed", placeholder="Add appointment / note…")
+        st.markdown('<div class="schedule-row">', unsafe_allow_html=True)
+        st.markdown(f'<div class="timecell">{hh}</div>', unsafe_allow_html=True)
+        val = st.text_input(label=hh, value=display_text, key=f"s_{hh}", label_visibility="collapsed", placeholder="Add appointment / note…")
+        st.markdown('</div>', unsafe_allow_html=True)
+        stored["manual_sched"][hh] = val
+
+# ---------- GUTTER DOTS ----------
+with right_col:
+    # vertical dots left edge (only on wide screens; CSS hides on mobile)
+    st.markdown('<div class="gutter">' + "".join('<div class="hole"></div>' for _ in range(10)) + '</div>', unsafe_allow_html=True)
+
+# ---------- RIGHT PAGE ----------
+with right_col:
+    # Quote / stamp header row
+    top = st.container()
+    with top:
+        cols = st.columns([0.65, 0.35])
+        with cols[0]:
+            st.markdown('<div class="section"><div class="section-title">Quote / Affirmation</div>', unsafe_allow_html=True)
+            stored["quote"] = st.text_input("quote", value=stored["quote"], label_visibility="collapsed", placeholder="Fear less, hope more…")
             st.markdown('</div>', unsafe_allow_html=True)
-            stored["manual_sched"][hh] = val
+        with cols[1]:
+            st.markdown('<div class="section">', unsafe_allow_html=True)
+            st.markdown(f"**{year_day_stamp(date)}**")
+            st.markdown('</div>', unsafe_allow_html=True)
 
+    # Notes (ruled)
+    st.markdown('<div class="section"><div class="section-title">Daily Notes</div>', unsafe_allow_html=True)
+    stored["notes"] = ruled_textarea("notes", stored["notes"], height=520, placeholder="Notes, calls, ideas…")
     st.markdown('</div>', unsafe_allow_html=True)
 
-with right:
-    # ---------- Quote ----------
-    st.markdown('<div class="section"><div class="section-title">Quote / Affirmation</div>', unsafe_allow_html=True)
-    stored["quote"] = st.text_input("quote", value=stored["quote"], label_visibility="collapsed", placeholder="Fear less, hope more…")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # ---------- Notes (ruled) ----------
-    st.markdown('<div class="section" style="margin-top:.5rem;"><div class="section-title">Daily Notes</div>', unsafe_allow_html=True)
-    stored["notes"] = ruled_textarea("notes", stored["notes"], height=560, placeholder="Notes, calls, ideas…")
-    st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)  # end page-grid
 
 # ---------------- Save Bar ----------------
-sb1, sb2, sb3 = st.columns([0.15, 0.7, 0.15])
+sb1, sb2, sb3 = st.columns([0.2, 0.6, 0.2])
 if sb1.button("💾 Save", use_container_width=True):
     save_day(date, stored)
     st.success("Saved ✔")
@@ -332,4 +381,4 @@ if sb3.button("🗑 Clear Day", use_container_width=True):
     save_day(date, stored)
     st.rerun()
 
-st.caption("Franklin-style Daily • compact teal layout • Outlook-aware")
+st.caption("Franklin-style Daily • compact teal layout • mobile-friendly • Outlook-aware")
