@@ -47,14 +47,13 @@ html, body, .block-container {{
 /* ---- Mini calendars: force all 3 inline on desktop ---- */
 .calrow {{
   display: flex;
+  flex-direction: row;
   justify-content: space-between;
   align-items: flex-start;
   gap: 6px;
   margin-bottom: .4rem;
 }}
 .calbox {{
-  display: flex;
-  flex-direction: row;
   flex: 0 0 28%;
   max-width: 28%;
   border: 1px solid {RULE};
