@@ -60,19 +60,13 @@ html, body, .block-container {{
   border-radius: 6px;
   padding: .18rem .22rem .24rem;
   background: white;
+  float: left;
 }}
-/* On narrow screens, allow wrapping so it's readable */
-@media (max-width: 820px) {{
-  .calrow {{ flex-wrap: wrap; }}
-  .calbox {{ flex: 0 0 100%; max-width: 100%; }}
-}}
-
 .calcap {{
   font-size: .68rem;
   font-weight: 700;
   text-align: center;
   margin-bottom: 2px;
-  float: left;
 }}
 .calgrid {{
   display: grid;
