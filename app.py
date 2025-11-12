@@ -44,18 +44,23 @@ html, body, .block-container {{
   padding-bottom: .1rem;
 }}
 
-.calrow {{
+.calrow {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  gap: 6px;
   margin-bottom: .4rem;
-}}
-.calbox {{
-  flex: 1 1 0;
-  border: 1px solid {RULE};
+}
+
+.calbox {
+  flex: 0 0 28%;
+  max-width: 28%;
+  border: 1px solid #9bc7c3;
   border-radius: 6px;
   padding: .18rem .22rem .24rem;
   background: white;
+}
 }}
 .calcap {{
   font-size: .68rem;
