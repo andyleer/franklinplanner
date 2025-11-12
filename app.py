@@ -53,6 +53,7 @@ html, body, .block-container {{
   margin-bottom: .4rem;
 }}
 .calbox {{
+  float: left;
   flex: 0 0 28%;
   max-width: 28%;
   border: 1px solid {RULE};
