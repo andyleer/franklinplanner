@@ -1,4 +1,4 @@
-# app.py – Franklin Planner (Left Page Only, compact + teal theme)
+# app.py – Franklin Planner (Left Page Only, compact + teal theme, 3 calendars inline)
 
 import streamlit as st
 import datetime as dt
@@ -44,24 +44,29 @@ html, body, .block-container {{
   padding-bottom: .1rem;
 }}
 
-.calrow {
+/* ---- Mini calendars: force all 3 inline on desktop ---- */
+.calrow {{
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   flex-wrap: nowrap;
   gap: 6px;
   margin-bottom: .4rem;
-}
-
-.calbox {
+}}
+.calbox {{
   flex: 0 0 28%;
   max-width: 28%;
-  border: 1px solid #9bc7c3;
+  border: 1px solid {RULE};
   border-radius: 6px;
   padding: .18rem .22rem .24rem;
   background: white;
-}
 }}
+/* On narrow screens, allow wrapping so it's readable */
+@media (max-width: 820px) {{
+  .calrow {{ flex-wrap: wrap; }}
+  .calbox {{ flex: 0 0 100%; max-width: 100%; }}
+}}
+
 .calcap {{
   font-size: .68rem;
   font-weight: 700;
@@ -165,7 +170,7 @@ stored=load_day(date)
 st.markdown(f"### {date.strftime('%A, %B %d, %Y')}")
 st.markdown(f"<div style='text-align:right;font-weight:700'>{day_stamp(date)}</div>",unsafe_allow_html=True)
 
-# Three calendars
+# Three calendars (single line on desktop)
 st.markdown('<div class="calrow">',unsafe_allow_html=True)
 prev=(date.replace(day=1)-dt.timedelta(days=1)).replace(day=1)
 next_=(date.replace(day=28)+dt.timedelta(days=10)).replace(day=1)
@@ -220,4 +225,4 @@ if cols[2].button("🗑 Clear",use_container_width=True):
     stored={"tasks":[],"tracker":{str(i):"" for i in range(1,9)},"sched":{}}
     save_day(date,stored); st.rerun()
 
-st.caption("Franklin Daily Planner • Left Page Only • Compact Teal Layout")
+st.caption("Franklin Daily Planner • Left Page Only • Compact Teal Layout (3 calendars inline)")
