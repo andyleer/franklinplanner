@@ -46,10 +46,9 @@ html, body, .block-container {{
 
 /* ---- Mini calendars: force all 3 inline on desktop ---- */
 .calrow {{
-  display: flex;
+  //display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  flex-wrap: nowrap;
+  //align-items: flex-start;
   gap: 6px;
   margin-bottom: .4rem;
 }}
@@ -60,7 +59,6 @@ html, body, .block-container {{
   border-radius: 6px;
   padding: .18rem .22rem .24rem;
   background: white;
-  float: left;
 }}
 .calcap {{
   font-size: .68rem;
