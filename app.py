@@ -72,12 +72,12 @@ html, body, .block-container {{
   font-weight: 700;
   text-align: center;
   margin-bottom: 2px;
+  float: left;
 }}
 .calgrid {{
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 1px;
-  float: left;
 }}
 .calgrid div {{
   text-align: center;
