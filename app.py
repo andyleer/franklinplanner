@@ -61,12 +61,12 @@ html, body, .block-container {{
   padding: .18rem .22rem .24rem;
   background: white;
 }}
-/* On narrow screens, allow wrapping so it's readable */
+/* On narrow screens, allow wrapping so it's readable 
 @media (max-width: 820px) {{
   .calrow {{ flex-wrap: wrap; }}
   .calbox {{ flex: 0 0 100%; max-width: 100%; }}
 }}
-
+*/
 .calcap {{
   font-size: .68rem;
   font-weight: 700;
