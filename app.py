@@ -1,4 +1,4 @@
-# app.py – Franklin Planner (Left Page Only, No Calendars, Compact Layout)
+# app.py – Franklin Planner (Left Page Only, Compact, 6 Preloaded Tasks + Inline Add)
 
 import streamlit as st
 import datetime as dt
@@ -42,7 +42,18 @@ html, body, .block-container {{
   border-bottom: 1px solid {RULE};
   margin-bottom: .25rem;
   padding-bottom: .1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }}
+.add-btn {{
+  background: none;
+  border: none;
+  color: {INK};
+  font-size: 1.1rem;
+  cursor: pointer;
+}}
+.add-btn:hover {{ color: #058; }}
 
 .schedule-row {{
   display: grid;
@@ -68,7 +79,7 @@ conn.commit()
 
 def normalize(entry: dict) -> dict:
     if not entry:
-        return {"tasks": [], "tracker": {str(i): "" for i in range(1, 9)}, "sched": {}}
+        entry = {"tasks": [], "tracker": {str(i): "" for i in range(1, 9)}, "sched": {}}
     tasks = []
     for t in entry.get("tasks", []):
         if not isinstance(t, dict):
@@ -79,6 +90,9 @@ def normalize(entry: dict) -> dict:
         t.setdefault("t", "")
         t.setdefault("done", False)
         tasks.append(t)
+    # pad to 6 blank tasks
+    while len(tasks) < 6:
+        tasks.append({"p": "A", "t": "", "done": False})
     entry["tasks"] = tasks
     tr = entry.get("tracker", {})
     entry["tracker"] = {str(i): tr.get(str(i), "") for i in range(1, 9)}
@@ -115,61 +129,64 @@ stored = load_day(date)
 st.markdown(f"### {date.strftime('%A, %B %d, %Y')}")
 st.markdown(f"<div style='text-align:right;font-weight:700'>{day_stamp(date)}</div>", unsafe_allow_html=True)
 
-# ABC Task List
-st.markdown('<div class="section"><div class="section-title">ABC Prioritized Daily Task List</div>', unsafe_allow_html=True)
-row = st.columns([0.15, 0.7, 0.15])
-pri = row[0].selectbox("P", ["A", "B", "C"], label_visibility="collapsed")
-txt = row[1].text_input("Task", "", label_visibility="collapsed", placeholder="Task description…")
-if row[2].button("Add", use_container_width=True) and txt.strip():
-    stored["tasks"].append({"p": pri, "t": txt.strip(), "done": False})
-    save_day(date, stored)
-    st.rerun()
+# ---------- ABC TASK LIST ----------
+col_header = st.columns([0.9, 0.1])
+with col_header[0]:
+    st.markdown('<div class="section-title">ABC Prioritized Daily Task List</div>', unsafe_allow_html=True)
+with col_header[1]:
+    if st.button("＋", use_container_width=True):
+        stored["tasks"].append({"p": "A", "t": "", "done": False})
+        save_day(date, stored)
+        st.rerun()
 
+st.markdown('<div class="section">', unsafe_allow_html=True)
 for i, t in enumerate(stored["tasks"]):
-    task_text = str(t.get("t") or t.get("task") or "")
-    r = st.columns([0.08, 0.08, 0.72, 0.12])
-    done = r[0].checkbox("", value=t.get("done", False), key=f"td{i}")
+    cols = st.columns([0.08, 0.12, 0.68, 0.12])
+    done = cols[0].checkbox("", value=t.get("done", False), key=f"td{i}")
     if done != t.get("done", False):
         t["done"] = done
         save_day(date, stored)
-    r[1].markdown(f"**{t.get('p', '')}**")
-    r[2].markdown(task_text)
-    if r[3].button("✕", key=f"tx{i}"):
+    pval = cols[1].selectbox("", ["A", "B", "C"], key=f"pri{i}", index=["A","B","C"].index(t.get("p","A")), label_visibility="collapsed")
+    if pval != t.get("p", "A"):
+        t["p"] = pval
+        save_day(date, stored)
+    task_text = cols[2].text_input("", value=t.get("t", ""), key=f"txt{i}", label_visibility="collapsed", placeholder="Task...")
+    if task_text != t.get("t", ""):
+        t["t"] = task_text
+        save_day(date, stored)
+    if cols[3].button("✕", key=f"del{i}"):
         stored["tasks"].pop(i)
         save_day(date, stored)
         st.rerun()
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Daily Tracker
+# ---------- DAILY TRACKER ----------
 st.markdown('<div class="section"><div class="section-title">Daily Tracker</div>', unsafe_allow_html=True)
 for i in range(1, 9):
     rr = st.columns([0.06, 0.94])
     rr[0].markdown(f"**{i}**")
-    stored["tracker"][str(i)] = rr[1].text_input(
-        f"trk{i}", value=stored["tracker"].get(str(i), ""), label_visibility="collapsed"
-    )
+    stored["tracker"][str(i)] = rr[1].text_input(f"trk{i}", value=stored["tracker"].get(str(i), ""), label_visibility="collapsed")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Appointment Schedule
+# ---------- APPOINTMENT SCHEDULE ----------
 st.markdown('<div class="section"><div class="section-title">Appointment Schedule</div>', unsafe_allow_html=True)
 for h in range(6, 23):
     hh = f"{h:02d}:00"
     st.markdown('<div class="schedule-row">', unsafe_allow_html=True)
     st.markdown(f'<div class="timecell">{hh}</div>', unsafe_allow_html=True)
-    stored["sched"][hh] = st.text_input(
-        "", value=stored["sched"].get(hh, ""), key=f"s{hh}", label_visibility="collapsed"
-    )
+    stored["sched"][hh] = st.text_input("", value=stored["sched"].get(hh, ""), key=f"s{hh}", label_visibility="collapsed")
     st.markdown('</div>', unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Save Bar
+# ---------- SAVE BAR ----------
 cols = st.columns([0.2, 0.6, 0.2])
 if cols[0].button("💾 Save", use_container_width=True):
     save_day(date, stored)
     st.success("Saved ✔")
 if cols[2].button("🗑 Clear", use_container_width=True):
-    stored = {"tasks": [], "tracker": {str(i): "" for i in range(1, 9)}, "sched": {}}
+    stored = {"tasks": [{"p": "A", "t": "", "done": False} for _ in range(6)],
+              "tracker": {str(i): "" for i in range(1, 9)}, "sched": {}}
     save_day(date, stored)
     st.rerun()
 
-st.caption("Franklin Daily Planner • Left Page Only • Compact Teal Layout (No Calendars)")
+st.caption("Franklin Daily Planner • Compact Left Page • 6 Preloaded Tasks + Inline Add")
