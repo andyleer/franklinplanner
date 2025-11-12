@@ -94,7 +94,7 @@ h1,h2,h3,h4 {{ color: {INK}; margin: .2rem 0 .3rem 0; }}
 }}
 .calbox {{
   float: left;
-  width: calc(33.333% - 8px);
+  width: calc(33.333% - 48px);
   margin-right: 12px;
   border: 1px solid {RULE};
   border-radius: 6px;
