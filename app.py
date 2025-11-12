@@ -155,6 +155,34 @@ def save_day(d, data):
     c.execute("REPLACE INTO planner (date, data) VALUES (?,?)", (str(d), json.dumps(data)))
     conn.commit()
 
+# --- One-time database cleanup for legacy task field names ---
+try:
+    c.execute("SELECT date, data FROM planner")
+    rows = c.fetchall()
+    updated = 0
+    for d, raw in rows:
+        try:
+            entry = json.loads(raw)
+            changed = False
+            if "tasks" in entry:
+                for t in entry["tasks"]:
+                    if "task" in t and "t" not in t:
+                        t["t"] = t["task"]
+                        changed = True
+                if changed:
+                    c.execute("UPDATE planner SET data=? WHERE date=?", (json.dumps(entry), d))
+                    updated += 1
+        except Exception:
+            pass
+    if updated:
+        conn.commit()
+        st.sidebar.success(f"Database cleaned: {updated} record(s) fixed ✅")
+except Exception as e:
+    st.sidebar.warning(f"Cleanup skipped: {e}")
+
+
+
+
 # ------------------ OUTLOOK ------------------
 def get_outlook_events(d):
     if not USE_OUTLOOK: return []
