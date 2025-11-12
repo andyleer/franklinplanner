@@ -46,8 +46,6 @@ html, body, .block-container {{
 
 /* ---- Mini calendars: force all 3 inline on desktop ---- */
 .calrow {{
-  display: flex;
-  flex-direction: row;
   justify-content: space-between;
   align-items: flex-start;
   gap: 6px;
