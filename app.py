@@ -59,7 +59,7 @@ h1,h2,h3,h4 {{ color: {INK}; margin: .2rem 0 .3rem 0; }}
 
 .page-grid {{
   display: grid;
-  grid-template-columns: 57% 43%;
+  grid-template-columns: 40% 40%;
   gap: 8px;
 }}
 @media (max-width: 950px) {{
