@@ -419,61 +419,189 @@ body {
 </div>
 
 <script>
-/* ====== DATE HANDLING ====== */
-function updateHeader(dateStr) {
-    const d = new Date(dateStr + "T00:00:00");
-    document.getElementById("day-number").textContent = d.getDate();
-    document.getElementById("weekday").textContent =
-        ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][d.getDay()];
-    document.getElementById("month-year").textContent =
-        d.toLocaleString("default", { month: "long" }) + " " + d.getFullYear();
-    renderAllCalendars(d);
+/* =====================================================================
+   1. Helper: Collect state from the page for saving
+   ===================================================================== */
+function collectPlannerState() {
+    const tasks = [...document.querySelectorAll("#task-list .task-row")].map(row => ({
+        checked: row.querySelector("input[type='checkbox']").checked,
+        priority: row.querySelector("select").value,
+        description: row.querySelector(".task-desc input").value
+    }));
+
+    const appointments = [...document.querySelectorAll(".appt-row")].map(row => ({
+        time: row.querySelector(".appt-time").textContent.trim(),
+        text: row.querySelector(".appt-input").value
+    }));
+
+    return {
+        date: document.getElementById("date-input").value,
+        tasks,
+        tracker: document.getElementById("tracker").value,
+        appointments,
+        notes: document.getElementById("notes") ? document.getElementById("notes").value : ""
+    };
 }
 
+/* =====================================================================
+   2. SAVE to server
+   ===================================================================== */
+let saveTimer;
+function saveEntryDebounced() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveEntry, 600); // Delay to avoid spamming server
+}
+
+async function saveEntry() {
+    const data = collectPlannerState();
+
+    try {
+        const res = await fetch("/api/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        });
+        const json = await res.json();
+
+        // Flash saved indicator
+        if (json.status === "saved") showSavedIndicator();
+    } catch (e) {
+        console.error("Save error:", e);
+    }
+}
+
+/* Saved Indicator */
+function showSavedIndicator() {
+    let el = document.getElementById("saved-indicator");
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "saved-indicator";
+        el.textContent = "Saved";
+        Object.assign(el.style, {
+            position: "fixed",
+            bottom: "20px",
+            right: "20px",
+            background: "#003b3b",
+            color: "white",
+            padding: "6px 12px",
+            borderRadius: "6px",
+            fontSize: "0.8rem",
+            opacity: "0",
+            transition: "opacity .3s"
+        });
+        document.body.appendChild(el);
+    }
+    el.style.opacity = "1";
+    setTimeout(() => (el.style.opacity = "0"), 1200);
+}
+
+/* =====================================================================
+   3. LOAD from server
+   ===================================================================== */
+async function loadEntry(dateStr) {
+    try {
+        const res = await fetch(`/api/load?date=${dateStr}`);
+        const data = await res.json();
+
+        // Tasks
+        const list = document.getElementById("task-list");
+        list.innerHTML = "";
+        data.tasks.forEach(t => {
+            const row = document.createElement("div");
+            row.className = "task-row";
+            row.innerHTML = `
+                <input type="checkbox" ${t.checked ? "checked" : ""}>
+                <select>
+                    <option ${t.priority === "A" ? "selected" : ""}>A</option>
+                    <option ${t.priority === "B" ? "selected" : ""}>B</option>
+                    <option ${t.priority === "C" ? "selected" : ""}>C</option>
+                </select>
+                <div class="task-desc">
+                    <input type="text" value="${t.description}">
+                </div>
+            `;
+            list.appendChild(row);
+        });
+
+        if (data.tasks.length === 0) {
+            for (let i = 0; i < 6; i++) addBlankTask();
+        }
+
+        // Tracker
+        document.getElementById("tracker").value = data.tracker;
+
+        // Appointments
+        const appts = document.querySelectorAll(".appt-row");
+        data.appointments.forEach((a, i) => {
+            if (appts[i]) appts[i].querySelector(".appt-input").value = a.text;
+        });
+
+        // Notes
+        if (document.getElementById("notes")) {
+            document.getElementById("notes").value = data.notes;
+        }
+
+    } catch (e) {
+        console.error("Load error:", e);
+    }
+}
+
+/* Helper: Add blank task row */
+function addBlankTask() {
+    const list = document.getElementById("task-list");
+    const row = document.createElement("div");
+    row.className = "task-row";
+    row.innerHTML = `
+        <input type="checkbox">
+        <select><option>A</option><option>B</option><option>C</option></select>
+        <div class="task-desc"><input type="text"></div>
+    `;
+    list.appendChild(row);
+}
+
+/* =====================================================================
+   4. Hook events for auto-save
+   ===================================================================== */
+function attachAutoSaveListeners() {
+    document.body.addEventListener("input", saveEntryDebounced);
+    document.body.addEventListener("change", saveEntryDebounced);
+}
+
+/* =====================================================================
+   5. Date change handler
+   ===================================================================== */
+function onDateChange(e) {
+    const date = e.target.value;
+    updateHeader(date);
+    loadEntry(date);
+}
+
+/* =====================================================================
+   6. INITIALIZE PAGE
+   ===================================================================== */
 document.addEventListener("DOMContentLoaded", () => {
-    const today = new Date().toISOString().slice(0, 10);
     const dateInput = document.getElementById("date-input");
 
+    // Set today's date initially
+    const today = new Date().toISOString().slice(0, 10);
     dateInput.value = today;
-    updateHeader(today);
 
-    dateInput.addEventListener("change", e => updateHeader(e.target.value));
+    updateHeader(today);  // existing function
+    loadEntry(today);     // <-- load DB content for this date
+    attachAutoSaveListeners();
 
-    /* TASKS */
-    function addTask() {
-        const list = document.getElementById("task-list");
-        const row = document.createElement("div");
-        row.className = "task-row";
-        row.innerHTML = `
-            <input type="checkbox">
-            <select>
-                <option>A</option>
-                <option>B</option>
-                <option>C</option>
-            </select>
-            <div class="task-desc"><input type="text"></div>
-        `;
-        list.appendChild(row);
-    }
+    dateInput.addEventListener("change", onDateChange);
 
-    for (let i = 0; i < 6; i++) addTask();
-    document.getElementById("add-task").addEventListener("click", addTask);
-
-    const toggleBtn = document.getElementById("toggleLayout");
-    const spread = document.getElementById("spread");
-
-    toggleBtn.addEventListener("click", () => {
-        if (spread.classList.contains("stacked")) {
-            spread.classList.remove("stacked");
-            toggleBtn.textContent = "Switch to Stacked View";
-        } else {
-            spread.classList.add("stacked");
-            toggleBtn.textContent = "Switch to Side-by-Side View";
-        }
+    // + Add Task button still works
+    document.getElementById("add-task").addEventListener("click", () => {
+        addBlankTask();
+        saveEntryDebounced();
     });
 });
 
-/* ========= MINI CALENDARS ========= */
+/* =====================================================================
+   Existing calendar rendering (unchanged)
+   ===================================================================== */
 function renderMiniCalendar(containerId, year, month) {
     const container = document.getElementById(containerId);
     container.innerHTML = "";
@@ -516,12 +644,12 @@ function renderMiniCalendar(containerId, year, month) {
 function renderAllCalendars(d) {
     const y = d.getFullYear();
     const m = d.getMonth();
-
     renderMiniCalendar("mini-current", y, m);
     renderMiniCalendar("mini-prev", y, m - 1);
     renderMiniCalendar("mini-next", y, m + 1);
 }
 </script>
+
 
 </body>
 </html>
