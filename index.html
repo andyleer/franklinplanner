@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>Franklin Planner</title>
 
 <style>
-/* ============ GLOBAL ============ */
+/* GLOBAL */
 body {
     background: #f5f7f6;
     font-family: "Franklin Gothic Medium", "Arial Narrow", Arial, sans-serif;
@@ -31,7 +31,7 @@ body {
     background: #d4e9e7;
 }
 
-/* Spread layout */
+/* Spread – two pages */
 .spread {
     display: flex;
     justify-content: center;
@@ -44,7 +44,7 @@ body {
     align-items: center;
 }
 
-/* Page */
+/* PAGE */
 .page {
     width: 540px;
     height: 750px;
@@ -54,11 +54,11 @@ body {
     padding: 1.25rem 1.75rem;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     box-sizing: border-box;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
 }
 
+/* PAGE BODY (2 columns) */
 .page-body {
     display: grid;
     grid-template-columns: 1.2fr 1.2fr;
@@ -66,23 +66,7 @@ body {
     gap: 1.6rem;
 }
 
-.left-column,
-.right-column {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-/* ============================
-   DATE BLOCK + CALENDAR
-   ============================ */
-.date-calendar-row {
-    display: grid;
-    grid-template-columns: 0.4fr 0.6fr;
-    gap: 1rem;
-    margin-bottom: 0.5rem;
-}
-
+/* DATE ROW */
 .date-row {
     display: flex;
     align-items: flex-start;
@@ -95,14 +79,16 @@ body {
 }
 .weekday {
     font-size: 1rem;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
+    margin-top: 0.25rem;
 }
 .month-year {
     font-size: 0.85rem;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
     color: #305f5f;
 }
-
 .date-picker-label {
     font-size: 0.75rem;
     margin-top: 0.25rem;
@@ -115,54 +101,40 @@ body {
     border: 1px solid #b0c4c3;
 }
 
-/* Mini calendars */
-#mini-current,
-.mini-calendar-small {
+/* MINICALS */
+.mini-calendar-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.mini-calendar-small,
+#mini-current {
     background: #fff;
     border: 1px solid #c4d1ce;
     border-radius: 4px;
+    padding: 0.25rem;
+    font-size: 0.65rem;
 }
-
-#mini-current {
-    width: 90%;
-    padding: 0.2rem;
-    font-size: 0.75rem;
-}
-
 .mini-cal-title {
     text-align: center;
     font-weight: bold;
+    font-size: 0.75rem;
     margin-bottom: 0.2rem;
-    font-size: 0.8rem;
 }
-
 .mini-cal-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     text-align: center;
-    font-size: 0.7rem;
 }
 .weekday-label {
     font-weight: bold;
     color: #406060;
-}
-
-.mini-calendar-row {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: .5rem;
-}
-.mini-calendar-small {
-    flex: 1;
-    padding: 0.25rem;
     font-size: 0.65rem;
 }
 
-/* ============================
-   ABC TASK LIST
-   ============================ */
+/* SECTION TITLES */
 .section-title {
-    padding-top: 15px;
+    padding-top: 10px;
     border-bottom: 1.5px solid #003b3b;
     padding-bottom: 0.2rem;
     margin-bottom: 0.4rem;
@@ -171,6 +143,7 @@ body {
     letter-spacing: 0.08em;
 }
 
+/* ABC TASK LIST */
 .task-row {
     display: grid;
     grid-template-columns: 0.4fr 0.7fr 6fr;
@@ -199,17 +172,17 @@ body {
     margin-top: 0.3rem;
     padding: 0.2rem 0.6rem;
     font-size: 0.75rem;
+    border-radius: 3px;
     border: 1px solid #305f5f;
+    color: #305f5f;
     background: transparent;
     cursor: pointer;
 }
-
-/* ============================
-   DAILY TRACKER
-   ============================ */
-.tracker-section {
-    margin-top: auto;
+.small-btn:hover {
+    background: rgba(48,95,95,0.08);
 }
+
+/* DAILY TRACKER */
 .tracker-wrapper {
     border: 1px solid #c3d2d0;
     background: repeating-linear-gradient(
@@ -223,15 +196,13 @@ body {
 .tracker-textarea {
     width: 100%;
     min-height: 170px;
-    padding: 0.4rem;
-    background: transparent;
     border: none;
+    background: transparent;
     font-size: 0.8rem;
 }
+.tracker-textarea:focus { outline: none; }
 
-/* ============================
-   APPOINTMENTS
-   ============================ */
+/* APPOINTMENTS */
 .appt-list {
     flex: 1;
     display: flex;
@@ -242,32 +213,16 @@ body {
     grid-template-columns: 0.5fr auto;
     border-bottom: 0.5px solid #c3d2d0;
     padding: 0.1rem 0;
-    flex: 1;
 }
 .appt-time {
-    font-size: 0.8rem;
     font-weight: bold;
-}
-.appt-input {
-    border: none;
-    background: transparent;
     font-size: 0.8rem;
 }
 
-/* ============================
-   RIGHT PAGE NOTES
-   ============================ */
-.right-page-title {
-    font-size: 0.9rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    border-bottom: 1.5px solid #003b3b;
-    padding-bottom: 0.25rem;
-    margin-bottom: 0.4rem;
-}
+/* NOTES PAGE */
 .notes-wrapper {
     border: 1px solid #c3d2d0;
-    height: 100%;
+    flex: 1;
     background: repeating-linear-gradient(
         to bottom,
         #ffffff 0,
@@ -279,113 +234,99 @@ body {
 .notes-textarea {
     width: 100%;
     height: 100%;
-    background: transparent;
-    border: none;
     padding: 0.5rem;
-    resize: none;
+    border: none;
+    background: transparent;
     font-size: 0.8rem;
 }
 </style>
 </head>
+
 <body>
 
-<!-- Toggle button -->
 <div class="controls">
     <button id="toggleLayout">Switch to Stacked View</button>
 </div>
 
 <div id="spread" class="spread">
 
-<!-- LEFT PAGE -->
-<div class="page">
-    <div class="page-body">
+    <!-- LEFT PAGE -->
+    <div class="page">
+        <div class="page-body">
 
-        <!-- LEFT COLUMN -->
-        <div class="left-column">
+            <!-- LEFT COLUMN -->
+            <div class="left-column">
 
-            <!-- Date + Big Calendar -->
-            <div class="date-calendar-row">
+                <!-- DATE BLOCK -->
+                <div class="date-row">
+                    <div class="day-number" id="day-number"></div>
+                    <div>
+                        <div class="weekday" id="weekday"></div>
+                        <div class="month-year" id="month-year"></div>
 
-                <!-- Date block -->
-                <div>
-                    <div class="date-row">
-                        <div class="day-number" id="day-number">15</div>
-                        <div>
-                            <div class="weekday" id="weekday">Tuesday</div>
-                            <div class="month-year" id="month-year">April 2025</div>
-                            <label class="date-picker-label">
-                                Date:
-                                <input type="date" id="date-input">
-                            </label>
-                        </div>
+                        <label class="date-picker-label">
+                            Date:
+                            <input type="date" id="date-input">
+                        </label>
                     </div>
                 </div>
 
-                <!-- Current month mini calendar -->
-                <div id="mini-current"></div>
-            </div>
+                <!-- SMALL CALS -->
+                <div class="mini-calendar-row">
+                    <div id="mini-prev" class="mini-calendar-small"></div>
+                    <div id="mini-next" class="mini-calendar-small"></div>
+                </div>
 
-            <!-- Prev + next mini calendars -->
-            <div class="mini-calendar-row">
-                <div id="mini-prev" class="mini-calendar-small"></div>
-                <div id="mini-next" class="mini-calendar-small"></div>
-            </div>
+                <!-- ABC TASK LIST -->
+                <div class="section-title">ABC PRIORITIZED DAILY TASK LIST</div>
+                <div id="task-list"></div>
+                <button class="small-btn" id="add-task">+ Add Task</button>
 
-            <!-- ABC Task List -->
-            <div class="section-title">ABC PRIORITIZED DAILY TASK LIST</div>
-            <div id="tasks"></div>
-            <button class="small-btn" id="add-task">+ Add Task</button>
-
-            <!-- Daily Tracker -->
-            <div class="tracker-section">
+                <!-- DAILY TRACKER -->
                 <div class="section-title">DAILY TRACKER</div>
                 <div class="tracker-wrapper">
-                    <textarea class="tracker-textarea" id="tracker"></textarea>
+                    <textarea id="tracker" class="tracker-textarea"></textarea>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN -->
+            <div class="right-column">
+                <div id="mini-current"></div>
+
+                <div class="section-title">APPOINTMENT SCHEDULE</div>
+
+                <div class="appt-list">
+                    <div class="appt-row"><div class="appt-time">7</div><input class="appt-input"></div>
+                    <div class="appt-row"><div class="appt-time">8</div><input class="appt-input"></div>
+                    <div class="appt-row"><div class="appt-time">9</div><input class="appt-input"></div>
+                    <div class="appt-row"><div class="appt-time">10</div><input class="appt-input"></div>
+                    <div class="appt-row"><div class="appt-time">11</div><input class="appt-input"></div>
+                    <div class="appt-row"><div class="appt-time">12</div><input class="appt-input"></div>
+                    <div class="appt-row"><div class="appt-time">1</div><input class="appt-input"></div>
+                    <div class="appt-row"><div class="appt-time">2</div><input class="appt-input"></div>
+                    <div class="appt-row"><div class="appt-time">3</div><input class="appt-input"></div>
+                    <div class="appt-row"><div class="appt-time">4</div><input class="appt-input"></div>
+                    <div class="appt-row"><div class="appt-time">5</div><input class="appt-input"></div>
+                    <div class="appt-row"><div class="appt-time">6</div><input class="appt-input"></div>
+                    <div class="appt-row"><div class="appt-time">7</div><input class="appt-input"></div>
+                    <div class="appt-row"><div class="appt-time">8</div><input class="appt-input"></div>
                 </div>
             </div>
 
         </div>
+    </div>
 
-        <!-- RIGHT COLUMN -->
-        <div class="right-column">
-
-            <!-- Appointment schedule -->
-            <div class="section-title">APPOINTMENT SCHEDULE</div>
-
-            <div class="appt-list">
-                <div class="appt-row"><div class="appt-time">7</div><input class="appt-input" data-time="7"></div>
-                <div class="appt-row"><div class="appt-time">8</div><input class="appt-input" data-time="8"></div>
-                <div class="appt-row"><div class="appt-time">9</div><input class="appt-input" data-time="9"></div>
-                <div class="appt-row"><div class="appt-time">10</div><input class="appt-input" data-time="10"></div>
-                <div class="appt-row"><div class="appt-time">11</div><input class="appt-input" data-time="11"></div>
-                <div class="appt-row"><div class="appt-time">12</div><input class="appt-input" data-time="12"></div>
-
-                <!-- Afternoon (military time) -->
-                <div class="appt-row"><div class="appt-time">1</div><input class="appt-input" data-time="13"></div>
-                <div class="appt-row"><div class="appt-time">2</div><input class="appt-input" data-time="14"></div>
-                <div class="appt-row"><div class="appt-time">3</div><input class="appt-input" data-time="15"></div>
-                <div class="appt-row"><div class="appt-time">4</div><input class="appt-input" data-time="16"></div>
-                <div class="appt-row"><div class="appt-time">5</div><input class="appt-input" data-time="17"></div>
-                <div class="appt-row"><div class="appt-time">6</div><input class="appt-input" data-time="18"></div>
-                <div class="appt-row"><div class="appt-time">7</div><input class="appt-input" data-time="19"></div>
-                <div class="appt-row"><div class="appt-time">8</div><input class="appt-input" data-time="20"></div>
-            </div>
-
+    <!-- RIGHT PAGE – NOTES -->
+    <div class="page">
+        <div class="section-title">NOTES</div>
+        <div class="notes-wrapper">
+            <textarea id="notes" class="notes-textarea"></textarea>
         </div>
     </div>
-</div>
-
-<!-- RIGHT PAGE -->
-<div class="page">
-    <div class="right-page-title">NOTES</div>
-    <div class="notes-wrapper">
-        <textarea class="notes-textarea" id="notes"></textarea>
-    </div>
-</div>
 
 </div>
 
-<!-- Planner logic -->
+<!-- Load ALL JS from planner.js -->
 <script src="planner.js"></script>
 
 </body>
