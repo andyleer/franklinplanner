@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Franklin Planner Layout</title>
+<title>Franklin Planner</title>
 
 <style>
 /* ============ GLOBAL ============ */
@@ -31,7 +31,7 @@ body {
     background: #d4e9e7;
 }
 
-/* Spread – holds left + right pages */
+/* Spread layout */
 .spread {
     display: flex;
     justify-content: center;
@@ -39,16 +39,12 @@ body {
     gap: 1rem;
     padding: 1rem;
 }
-
-/* Stacked layout */
 .spread.stacked {
     flex-direction: column;
     align-items: center;
 }
 
-/* ============================
-     PAGE – STATIC SIZE
-   ============================ */
+/* Page */
 .page {
     width: 540px;
     height: 750px;
@@ -63,9 +59,6 @@ body {
     flex-direction: column;
 }
 
-/* ============================
-     PAGE BODY (2 columns)
-   ============================ */
 .page-body {
     display: grid;
     grid-template-columns: 1.2fr 1.2fr;
@@ -73,7 +66,6 @@ body {
     gap: 1.6rem;
 }
 
-/* Left + Right column containers */
 .left-column,
 .right-column {
     height: 100%;
@@ -81,9 +73,9 @@ body {
     flex-direction: column;
 }
 
-/* -------------------------------------------------
-   DATE BLOCK + CURRENT MONTH CALENDAR ROW
-   ------------------------------------------------- */
+/* ============================
+   DATE BLOCK + CALENDAR
+   ============================ */
 .date-calendar-row {
     display: grid;
     grid-template-columns: 0.4fr 0.6fr;
@@ -91,29 +83,22 @@ body {
     margin-bottom: 0.5rem;
 }
 
-/* ==== DATE BLOCK ==== */
 .date-row {
     display: flex;
     align-items: flex-start;
     gap: 0.7rem;
 }
-
 .day-number {
     font-size: 2.8rem;
     font-weight: 700;
     line-height: 1;
 }
-
 .weekday {
     font-size: 1rem;
-    letter-spacing: 0.06em;
     text-transform: uppercase;
-    margin-top: 0.25rem;
 }
-
 .month-year {
     font-size: 0.85rem;
-    letter-spacing: 0.04em;
     text-transform: uppercase;
     color: #305f5f;
 }
@@ -130,23 +115,25 @@ body {
     border: 1px solid #b0c4c3;
 }
 
-/* -------------------------------------------------
-   MINI CALENDARS
-   ------------------------------------------------- */
-#mini-current {
-    width: 90%;
-    background: #ffffff;
+/* Mini calendars */
+#mini-current,
+.mini-calendar-small {
+    background: #fff;
     border: 1px solid #c4d1ce;
     border-radius: 4px;
-    padding: 0.1rem;
+}
+
+#mini-current {
+    width: 90%;
+    padding: 0.2rem;
     font-size: 0.75rem;
 }
 
 .mini-cal-title {
     text-align: center;
     font-weight: bold;
-    font-size: 0.8rem;
     margin-bottom: 0.2rem;
+    font-size: 0.8rem;
 }
 
 .mini-cal-grid {
@@ -155,39 +142,27 @@ body {
     text-align: center;
     font-size: 0.7rem;
 }
-.mini-cal-grid div {
-    padding: 2px 0;
-}
 .weekday-label {
     font-weight: bold;
     color: #406060;
 }
 
-/* Smaller calendars */
 .mini-calendar-row {
     display: flex;
     gap: 0.5rem;
     margin-bottom: .5rem;
 }
-
 .mini-calendar-small {
     flex: 1;
-    background: #ffffff;
-    border: 1px solid #c4d1ce;
-    border-radius: 4px;
     padding: 0.25rem;
     font-size: 0.65rem;
 }
 
-.mini-calendar-small .mini-cal-grid {
-    font-size: 0.6rem;
-}
-
-/* -------------------------------------------------
+/* ============================
    ABC TASK LIST
-   ------------------------------------------------- */
+   ============================ */
 .section-title {
-    padding-top: 20px;
+    padding-top: 15px;
     border-bottom: 1.5px solid #003b3b;
     padding-bottom: 0.2rem;
     margin-bottom: 0.4rem;
@@ -210,7 +185,6 @@ body {
 .task-row select {
     width: 180%;
     font-size: 0.75rem;
-    padding: 0.05rem 0.1rem;
 }
 .task-desc input {
     width: 100%;
@@ -225,23 +199,17 @@ body {
     margin-top: 0.3rem;
     padding: 0.2rem 0.6rem;
     font-size: 0.75rem;
-    border-radius: 3px;
     border: 1px solid #305f5f;
-    color: #305f5f;
     background: transparent;
     cursor: pointer;
 }
-.small-btn:hover {
-    background: rgba(48,95,95,0.08);
-}
 
-/* -------------------------------------------------
+/* ============================
    DAILY TRACKER
-   ------------------------------------------------- */
+   ============================ */
 .tracker-section {
     margin-top: auto;
 }
-
 .tracker-wrapper {
     border: 1px solid #c3d2d0;
     background: repeating-linear-gradient(
@@ -260,17 +228,15 @@ body {
     border: none;
     font-size: 0.8rem;
 }
-.tracker-textarea:focus { outline: none; }
 
-/* -------------------------------------------------
-   APPOINTMENT SCHEDULE
-   ------------------------------------------------- */
+/* ============================
+   APPOINTMENTS
+   ============================ */
 .appt-list {
     flex: 1;
     display: flex;
     flex-direction: column;
 }
-
 .appt-row {
     display: grid;
     grid-template-columns: 0.5fr auto;
@@ -278,23 +244,19 @@ body {
     padding: 0.1rem 0;
     flex: 1;
 }
-
 .appt-time {
-    text-align: left;
-    padding-right: 0.3rem;
     font-size: 0.8rem;
     font-weight: bold;
 }
-
 .appt-input {
     border: none;
     background: transparent;
     font-size: 0.8rem;
 }
 
-/* -------------------------------------------------
+/* ============================
    RIGHT PAGE NOTES
-   ------------------------------------------------- */
+   ============================ */
 .right-page-title {
     font-size: 0.9rem;
     font-weight: 700;
@@ -303,7 +265,6 @@ body {
     padding-bottom: 0.25rem;
     margin-bottom: 0.4rem;
 }
-
 .notes-wrapper {
     border: 1px solid #c3d2d0;
     height: 100%;
@@ -318,18 +279,17 @@ body {
 .notes-textarea {
     width: 100%;
     height: 100%;
-    padding: 0.5rem;
     background: transparent;
     border: none;
-    font-size: 0.8rem;
+    padding: 0.5rem;
     resize: none;
+    font-size: 0.8rem;
 }
-
 </style>
 </head>
 <body>
 
-<!-- ====== LAYOUT TOGGLE ====== -->
+<!-- Toggle button -->
 <div class="controls">
     <button id="toggleLayout">Switch to Stacked View</button>
 </div>
@@ -343,8 +303,10 @@ body {
         <!-- LEFT COLUMN -->
         <div class="left-column">
 
-            <!-- DATE + LARGE CAL -->
+            <!-- Date + Big Calendar -->
             <div class="date-calendar-row">
+
+                <!-- Date block -->
                 <div>
                     <div class="date-row">
                         <div class="day-number" id="day-number">15</div>
@@ -358,21 +320,23 @@ body {
                         </div>
                     </div>
                 </div>
-                
+
+                <!-- Current month mini calendar -->
+                <div id="mini-current"></div>
             </div>
 
-            <!-- PREV + NEXT SMALL CALS -->
+            <!-- Prev + next mini calendars -->
             <div class="mini-calendar-row">
                 <div id="mini-prev" class="mini-calendar-small"></div>
                 <div id="mini-next" class="mini-calendar-small"></div>
             </div>
 
-            <!-- ABC LIST -->
+            <!-- ABC Task List -->
             <div class="section-title">ABC PRIORITIZED DAILY TASK LIST</div>
-            <div id="task-list"></div>
+            <div id="tasks"></div>
             <button class="small-btn" id="add-task">+ Add Task</button>
 
-            <!-- DAILY TRACKER -->
+            <!-- Daily Tracker -->
             <div class="tracker-section">
                 <div class="section-title">DAILY TRACKER</div>
                 <div class="tracker-wrapper">
@@ -383,28 +347,31 @@ body {
         </div>
 
         <!-- RIGHT COLUMN -->
-       <div class="right-column">
-    <div id="mini-current"></div>
-    <div class="section-title">APPOINTMENT SCHEDULE</div>
-    <div class="appt-list">
-        <div class="appt-row"><div class="appt-time">7</div><input class="appt-input"></div>
-        <div class="appt-row"><div class="appt-time">8</div><input class="appt-input"></div>
-        <div class="appt-row"><div class="appt-time">9</div><input class="appt-input"></div>
-        <div class="appt-row"><div class="appt-time">10</div><input class="appt-input"></div>
-        <div class="appt-row"><div class="appt-time">11</div><input class="appt-input"></div>
-        <div class="appt-row"><div class="appt-time">12</div><input class="appt-input"></div>
-        <div class="appt-row"><div class="appt-time">1</div><input class="appt-input"></div>
-        <div class="appt-row"><div class="appt-time">2</div><input class="appt-input"></div>
-        <div class="appt-row"><div class="appt-time">3</div><input class="appt-input"></div>
-        <div class="appt-row"><div class="appt-time">4</div><input class="appt-input"></div>
-        <div class="appt-row"><div class="appt-time">5</div><input class="appt-input"></div>
-        <div class="appt-row"><div class="appt-time">6</div><input class="appt-input"></div>
-        <div class="appt-row"><div class="appt-time">7</div><input class="appt-input"></div>
-        <div class="appt-row"><div class="appt-time">8</div><input class="appt-input"></div>
-    </div>
+        <div class="right-column">
 
-</div>
+            <!-- Appointment schedule -->
+            <div class="section-title">APPOINTMENT SCHEDULE</div>
 
+            <div class="appt-list">
+                <div class="appt-row"><div class="appt-time">7</div><input class="appt-input" data-time="7"></div>
+                <div class="appt-row"><div class="appt-time">8</div><input class="appt-input" data-time="8"></div>
+                <div class="appt-row"><div class="appt-time">9</div><input class="appt-input" data-time="9"></div>
+                <div class="appt-row"><div class="appt-time">10</div><input class="appt-input" data-time="10"></div>
+                <div class="appt-row"><div class="appt-time">11</div><input class="appt-input" data-time="11"></div>
+                <div class="appt-row"><div class="appt-time">12</div><input class="appt-input" data-time="12"></div>
+
+                <!-- Afternoon (military time) -->
+                <div class="appt-row"><div class="appt-time">1</div><input class="appt-input" data-time="13"></div>
+                <div class="appt-row"><div class="appt-time">2</div><input class="appt-input" data-time="14"></div>
+                <div class="appt-row"><div class="appt-time">3</div><input class="appt-input" data-time="15"></div>
+                <div class="appt-row"><div class="appt-time">4</div><input class="appt-input" data-time="16"></div>
+                <div class="appt-row"><div class="appt-time">5</div><input class="appt-input" data-time="17"></div>
+                <div class="appt-row"><div class="appt-time">6</div><input class="appt-input" data-time="18"></div>
+                <div class="appt-row"><div class="appt-time">7</div><input class="appt-input" data-time="19"></div>
+                <div class="appt-row"><div class="appt-time">8</div><input class="appt-input" data-time="20"></div>
+            </div>
+
+        </div>
     </div>
 </div>
 
@@ -418,239 +385,8 @@ body {
 
 </div>
 
-<script>
-/* =====================================================================
-   1. Helper: Collect state from the page for saving
-   ===================================================================== */
-function collectPlannerState() {
-    const tasks = [...document.querySelectorAll("#task-list .task-row")].map(row => ({
-        checked: row.querySelector("input[type='checkbox']").checked,
-        priority: row.querySelector("select").value,
-        description: row.querySelector(".task-desc input").value
-    }));
-
-    const appointments = [...document.querySelectorAll(".appt-row")].map(row => ({
-        time: row.querySelector(".appt-time").textContent.trim(),
-        text: row.querySelector(".appt-input").value
-    }));
-
-    return {
-        date: document.getElementById("date-input").value,
-        tasks,
-        tracker: document.getElementById("tracker").value,
-        appointments,
-        notes: document.getElementById("notes") ? document.getElementById("notes").value : ""
-    };
-}
-
-/* =====================================================================
-   2. SAVE to server
-   ===================================================================== */
-let saveTimer;
-function saveEntryDebounced() {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(saveEntry, 600); // Delay to avoid spamming server
-}
-
-async function saveEntry() {
-    const data = collectPlannerState();
-
-    try {
-        const res = await fetch("/api/save", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data)
-        });
-        const json = await res.json();
-
-        // Flash saved indicator
-        if (json.status === "saved") showSavedIndicator();
-    } catch (e) {
-        console.error("Save error:", e);
-    }
-}
-
-/* Saved Indicator */
-function showSavedIndicator() {
-    let el = document.getElementById("saved-indicator");
-    if (!el) {
-        el = document.createElement("div");
-        el.id = "saved-indicator";
-        el.textContent = "Saved";
-        Object.assign(el.style, {
-            position: "fixed",
-            bottom: "20px",
-            right: "20px",
-            background: "#003b3b",
-            color: "white",
-            padding: "6px 12px",
-            borderRadius: "6px",
-            fontSize: "0.8rem",
-            opacity: "0",
-            transition: "opacity .3s"
-        });
-        document.body.appendChild(el);
-    }
-    el.style.opacity = "1";
-    setTimeout(() => (el.style.opacity = "0"), 1200);
-}
-
-/* =====================================================================
-   3. LOAD from server
-   ===================================================================== */
-async function loadEntry(dateStr) {
-    try {
-        const res = await fetch(`/api/load?date=${dateStr}`);
-        const data = await res.json();
-
-        // Tasks
-        const list = document.getElementById("task-list");
-        list.innerHTML = "";
-        data.tasks.forEach(t => {
-            const row = document.createElement("div");
-            row.className = "task-row";
-            row.innerHTML = `
-                <input type="checkbox" ${t.checked ? "checked" : ""}>
-                <select>
-                    <option ${t.priority === "A" ? "selected" : ""}>A</option>
-                    <option ${t.priority === "B" ? "selected" : ""}>B</option>
-                    <option ${t.priority === "C" ? "selected" : ""}>C</option>
-                </select>
-                <div class="task-desc">
-                    <input type="text" value="${t.description}">
-                </div>
-            `;
-            list.appendChild(row);
-        });
-
-        if (data.tasks.length === 0) {
-            for (let i = 0; i < 6; i++) addBlankTask();
-        }
-
-        // Tracker
-        document.getElementById("tracker").value = data.tracker;
-
-        // Appointments
-        const appts = document.querySelectorAll(".appt-row");
-        data.appointments.forEach((a, i) => {
-            if (appts[i]) appts[i].querySelector(".appt-input").value = a.text;
-        });
-
-        // Notes
-        if (document.getElementById("notes")) {
-            document.getElementById("notes").value = data.notes;
-        }
-
-    } catch (e) {
-        console.error("Load error:", e);
-    }
-}
-
-/* Helper: Add blank task row */
-function addBlankTask() {
-    const list = document.getElementById("task-list");
-    const row = document.createElement("div");
-    row.className = "task-row";
-    row.innerHTML = `
-        <input type="checkbox">
-        <select><option>A</option><option>B</option><option>C</option></select>
-        <div class="task-desc"><input type="text"></div>
-    `;
-    list.appendChild(row);
-}
-
-/* =====================================================================
-   4. Hook events for auto-save
-   ===================================================================== */
-function attachAutoSaveListeners() {
-    document.body.addEventListener("input", saveEntryDebounced);
-    document.body.addEventListener("change", saveEntryDebounced);
-}
-
-/* =====================================================================
-   5. Date change handler
-   ===================================================================== */
-function onDateChange(e) {
-    const date = e.target.value;
-    updateHeader(date);
-    loadEntry(date);
-}
-
-/* =====================================================================
-   6. INITIALIZE PAGE
-   ===================================================================== */
-document.addEventListener("DOMContentLoaded", () => {
-    const dateInput = document.getElementById("date-input");
-
-    // Set today's date initially
-    const today = new Date().toISOString().slice(0, 10);
-    dateInput.value = today;
-
-    updateHeader(today);  // existing function
-    loadEntry(today);     // <-- load DB content for this date
-    attachAutoSaveListeners();
-
-    dateInput.addEventListener("change", onDateChange);
-
-    // + Add Task button still works
-    document.getElementById("add-task").addEventListener("click", () => {
-        addBlankTask();
-        saveEntryDebounced();
-    });
-});
-
-/* =====================================================================
-   Existing calendar rendering (unchanged)
-   ===================================================================== */
-function renderMiniCalendar(containerId, year, month) {
-    const container = document.getElementById(containerId);
-    container.innerHTML = "";
-
-    const title = document.createElement("div");
-    title.className = "mini-cal-title";
-    title.textContent = new Date(year, month).toLocaleString("default", {
-        month: "long",
-        year: "numeric"
-    });
-
-    const grid = document.createElement("div");
-    grid.className = "mini-cal-grid";
-
-    const weekdays = ["S","M","T","W","T","F","S"];
-    weekdays.forEach(d => {
-        const cell = document.createElement("div");
-        cell.className = "weekday-label";
-        cell.textContent = d;
-        grid.appendChild(cell);
-    });
-
-    const first = new Date(year, month, 1);
-    const last = new Date(year, month + 1, 0);
-
-    for (let i = 0; i < first.getDay(); i++) {
-        grid.appendChild(document.createElement("div"));
-    }
-
-    for (let day = 1; day <= last.getDate(); day++) {
-        const div = document.createElement("div");
-        div.textContent = day;
-        grid.appendChild(div);
-    }
-
-    container.appendChild(title);
-    container.appendChild(grid);
-}
-
-function renderAllCalendars(d) {
-    const y = d.getFullYear();
-    const m = d.getMonth();
-    renderMiniCalendar("mini-current", y, m);
-    renderMiniCalendar("mini-prev", y, m - 1);
-    renderMiniCalendar("mini-next", y, m + 1);
-}
-</script>
+<!-- Planner logic -->
 <script src="planner.js"></script>
-
 
 </body>
 </html>
