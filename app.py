@@ -1,103 +1,131 @@
-from flask import Flask, request, jsonify, send_from_directory
-from flask_sqlalchemy import SQLAlchemy
 import os
-import json
+from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
 
-app = Flask(__name__, static_folder=".")
+app = Flask(__name__)
 
-# ------------------------------------------------------
+# -----------------------------
 # DATABASE CONFIG
-# ------------------------------------------------------
-DATABASE_URL = os.environ.get("DATABASE_URL")
+# -----------------------------
+db_url = os.getenv("DATABASE_URL")
+if not db_url:
+    raise Exception("DATABASE_URL missing — Render did not inject it.")
 
-if not DATABASE_URL:
-    raise Exception("DATABASE_URL not found. Make sure Render env var is set.")
+# Render gives: postgresql://...
+# SQLAlchemy needs: postgresql+psycopg2://...
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql+psycopg2://")
+if db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+psycopg2://")
 
-# Render gives “postgresql://” sometimes — SQLAlchemy needs “postgresql+psycopg2://”
-if DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://")
-
-app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
 
-# ------------------------------------------------------
-# DATABASE MODEL
-# ------------------------------------------------------
-class PlannerEntry(db.Model):
+# -----------------------------
+# DATABASE MODELS
+# -----------------------------
+
+class Day(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.String(20), unique=True, nullable=False)
-    tasks_json = db.Column(db.Text, nullable=True)
-    tracker_text = db.Column(db.Text, nullable=True)
-    appts_json = db.Column(db.Text, nullable=True)
-    notes_text = db.Column(db.Text, nullable=True)
+    date = db.Column(db.String, unique=True, nullable=False)
+    notes = db.Column(db.Text, default="")
+    tracker = db.Column(db.Text, default="")
 
-    def to_dict(self):
-        return {
-            "date": self.date,
-            "tasks": json.loads(self.tasks_json) if self.tasks_json else [],
-            "tracker": self.tracker_text or "",
-            "appointments": json.loads(self.appts_json) if self.appts_json else [],
-            "notes": self.notes_text or ""
-        }
+class Task(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.String, nullable=False)
+    priority = db.Column(db.String(1))   # A/B/C
+    text = db.Column(db.String)
+    done = db.Column(db.Boolean, default=False)
 
-# Create the table if not exists
+class Appointment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.String, nullable=False)
+    time = db.Column(db.String)   # "7", "8", "9" etc
+    text = db.Column(db.String)
+
+
+# -----------------------------
+# INITIALIZE TABLES
+# -----------------------------
 with app.app_context():
     db.create_all()
 
-# ------------------------------------------------------
-# API ROUTES
-# ------------------------------------------------------
 
-@app.route("/api/load")
-def api_load():
-    date = request.args.get("date")
-    if not date:
-        return jsonify({"error": "date required"}), 400
+# -----------------------------
+# ROUTES
+# -----------------------------
 
-    entry = PlannerEntry.query.filter_by(date=date).first()
-    if not entry:
-        # Return a blank entry if none exists
-        return jsonify({
-            "date": date,
-            "tasks": [],
-            "tracker": "",
-            "appointments": [],
-            "notes": ""
-        })
+@app.route("/")
+def home():
+    return "Planner backend is running."
 
-    return jsonify(entry.to_dict())
+# -----------------------------
+# LOAD A DAY
+# -----------------------------
+@app.route("/api/day/<date>", methods=["GET"])
+def load_day(date):
+    day = Day.query.filter_by(date=date).first()
+    tasks = Task.query.filter_by(date=date).all()
+    appts = Appointment.query.filter_by(date=date).all()
 
+    return jsonify({
+        "date": date,
+        "notes": day.notes if day else "",
+        "tracker": day.tracker if day else "",
+        "tasks": [
+            {"id": t.id, "priority": t.priority, "text": t.text, "done": t.done}
+            for t in tasks
+        ],
+        "appointments": [
+            {"id": a.id, "time": a.time, "text": a.text}
+            for a in appts
+        ]
+    })
 
-@app.route("/api/save", methods=["POST"])
-def api_save():
+# -----------------------------
+# SAVE A DAY
+# -----------------------------
+@app.route("/api/day/<date>", methods=["POST"])
+def save_day(date):
     data = request.json
-    date = data.get("date")
 
-    entry = PlannerEntry.query.filter_by(date=date).first()
+    # Save notes + tracker
+    day = Day.query.filter_by(date=date).first()
+    if not day:
+        day = Day(date=date)
+        db.session.add(day)
 
-    if not entry:
-        entry = PlannerEntry(date=date)
+    day.notes = data.get("notes", "")
+    day.tracker = data.get("tracker", "")
 
-    entry.tasks_json = json.dumps(data.get("tasks", []))
-    entry.tracker_text = data.get("tracker", "")
-    entry.appts_json = json.dumps(data.get("appointments", []))
-    entry.notes_text = data.get("notes", "")
+    # Clear existing tasks + reinsert
+    Task.query.filter_by(date=date).delete()
+    for t in data.get("tasks", []):
+        db.session.add(Task(
+            date=date,
+            priority=t.get("priority", "C"),
+            text=t.get("text", ""),
+            done=t.get("done", False)
+        ))
 
-    db.session.add(entry)
+    # Clear existing appointments + reinsert
+    Appointment.query.filter_by(date=date).delete()
+    for a in data.get("appointments", []):
+        db.session.add(Appointment(
+            date=date,
+            time=a.get("time", ""),
+            text=a.get("text", "")
+        ))
+
     db.session.commit()
 
-    return jsonify({"status": "saved"})
+    return jsonify({"status": "saved", "date": date})
 
-
-# ------------------------------------------------------
-# FRONTEND ROUTE
-# ------------------------------------------------------
-@app.route("/")
-def index():
-    return send_from_directory(".", "index.html")
-
-
+# -----------------------------
+# MAIN
+# -----------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
