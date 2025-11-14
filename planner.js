@@ -1,20 +1,20 @@
 // planner.js
 // Franklin-style daily planner front-end logic
-// Works with backend endpoints: 
+// Backend endpoints:
 //   GET  /api/day/<YYYY-MM-DD>
 //   POST /api/day/<YYYY-MM-DD>
 
 (function () {
+    "use strict";
+
     /* =====================================================================
        1. UTIL – Get active date (YYYY-MM-DD)
        ===================================================================== */
     function getActiveDate() {
         const dateInput = document.getElementById("date-input");
-        if (!dateInput) {
-            const today = new Date().toISOString().slice(0, 10);
-            return today;
-        }
-        return dateInput.value || new Date().toISOString().slice(0, 10);
+        const today = new Date().toISOString().slice(0, 10);
+        if (!dateInput) return today;
+        return dateInput.value || today;
     }
 
     /* =====================================================================
@@ -23,18 +23,28 @@
     function collectPlannerState() {
         const tasks = Array.from(
             document.querySelectorAll("#task-list .task-row")
-        ).map(row => ({
-            checked: row.querySelector("input[type='checkbox']").checked,
-            priority: row.querySelector("select").value,
-            description: row.querySelector(".task-desc input").value
-        }));
+        ).map(row => {
+            const checkbox = row.querySelector("input[type='checkbox']");
+            const select = row.querySelector("select");
+            const descInput = row.querySelector(".task-desc input");
+
+            return {
+                checked: checkbox ? checkbox.checked : false,
+                priority: select ? select.value : "A",
+                description: descInput ? descInput.value : ""
+            };
+        });
 
         const appointments = Array.from(
             document.querySelectorAll(".appt-row")
-        ).map(row => ({
-            time: row.querySelector(".appt-time").textContent.trim(),
-            text: row.querySelector(".appt-input").value
-        }));
+        ).map(row => {
+            const timeEl = row.querySelector(".appt-time");
+            const input = row.querySelector(".appt-input");
+            return {
+                time: timeEl ? timeEl.textContent.trim() : "",
+                text: input ? input.value : ""
+            };
+        });
 
         return {
             date: getActiveDate(),
@@ -53,25 +63,35 @@
         const list = document.getElementById("task-list");
         if (list) {
             list.innerHTML = "";
-            tasks.forEach(t => {
-                const row = document.createElement("div");
-                row.className = "task-row";
-                row.innerHTML = `
-                    <input type="checkbox" ${t.checked ? "checked" : ""}>
-                    <select>
-                        <option ${t.priority === "A" ? "selected" : ""}>A</option>
-                        <option ${t.priority === "B" ? "selected" : ""}>B</option>
-                        <option ${t.priority === "C" ? "selected" : ""}>C</option>
-                    </select>
-                    <div class="task-desc">
-                        <input type="text" value="${t.description ? t.description.replace(/"/g, "&quot;") : ""}">
-                    </div>
-                `;
-                list.appendChild(row);
-            });
 
-            // If nothing in DB, start with 6 blanks
-            if (tasks.length === 0) {
+            if (tasks.length > 0) {
+                tasks.forEach(t => {
+                    const row = document.createElement("div");
+                    row.className = "task-row";
+
+                    const safeDesc = (t.description || "")
+                        .replace(/&/g, "&amp;")
+                        .replace(/"/g, "&quot;")
+                        .replace(/</g, "&lt;")
+                        .replace(/>/g, "&gt;");
+
+                    row.innerHTML = `
+                        <input type="checkbox" ${t.checked ? "checked" : ""}>
+                        <select>
+                            <option ${t.priority === "A" ? "selected" : ""}>A</option>
+                            <option ${t.priority === "B" ? "selected" : ""}>B</option>
+                            <option ${t.priority === "C" ? "selected" : ""}>C</option>
+                        </select>
+                        <div class="task-desc">
+                            <input type="text" value="${safeDesc}">
+                        </div>
+                    `;
+                    list.appendChild(row);
+                });
+            }
+
+            // If nothing in DB, or tasks array empty, create 6 blank rows
+            if (list.children.length === 0) {
                 for (let i = 0; i < 6; i++) addBlankTask();
             }
         }
@@ -122,6 +142,9 @@
             const json = await res.json();
             if (json && (json.status === "ok" || json.status === "saved" || json.id)) {
                 showSavedIndicator();
+            } else {
+                // still show: POST succeeded
+                showSavedIndicator();
             }
         } catch (err) {
             console.error("Save error:", err);
@@ -144,7 +167,8 @@
                 borderRadius: "6px",
                 fontSize: "0.8rem",
                 opacity: "0",
-                transition: "opacity 0.25s ease"
+                transition: "opacity 0.25s ease",
+                zIndex: "9999"
             });
             document.body.appendChild(el);
         }
@@ -163,7 +187,6 @@
         try {
             const res = await fetch(`/api/day/${date}`);
             if (!res.ok) {
-                // If no entry yet, just ensure defaults
                 console.warn("No saved entry for", date, "status:", res.status);
                 applyPlannerState({
                     tasks: [],
@@ -178,6 +201,13 @@
             applyPlannerState(data);
         } catch (err) {
             console.error("Load error:", err);
+            // fall back to empty
+            applyPlannerState({
+                tasks: [],
+                tracker: "",
+                appointments: [],
+                notes: ""
+            });
         }
     }
 
@@ -187,6 +217,7 @@
     function addBlankTask() {
         const list = document.getElementById("task-list");
         if (!list) return;
+
         const row = document.createElement("div");
         row.className = "task-row";
         row.innerHTML = `
@@ -215,10 +246,12 @@
         const monthYearEl = document.getElementById("month-year");
 
         if (dayNumberEl) dayNumberEl.textContent = d.getDate();
+
         if (weekdayEl) {
             const names = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
             weekdayEl.textContent = names[d.getDay()];
         }
+
         if (monthYearEl) {
             monthYearEl.textContent = d.toLocaleString("default", {
                 month: "long",
@@ -235,7 +268,7 @@
 
         container.innerHTML = "";
 
-        // Support prev/next month by letting JS handle roll-over
+        // Let JS normalize months like m-1, m+1
         const shownDate = new Date(year, month, 1);
         const shownYear = shownDate.getFullYear();
         const shownMonth = shownDate.getMonth();
@@ -261,10 +294,12 @@
         const first = new Date(shownYear, shownMonth, 1);
         const last = new Date(shownYear, shownMonth + 1, 0);
 
+        // leading blanks
         for (let i = 0; i < first.getDay(); i++) {
             grid.appendChild(document.createElement("div"));
         }
 
+        // days
         for (let day = 1; day <= last.getDate(); day++) {
             const div = document.createElement("div");
             div.textContent = day;
@@ -279,21 +314,15 @@
         const y = d.getFullYear();
         const m = d.getMonth();
 
-        // main month on right column
         renderMiniCalendar("mini-current", y, m);
-
-        // previous month
         renderMiniCalendar("mini-prev", y, m - 1);
-
-        // next month
         renderMiniCalendar("mini-next", y, m + 1);
     }
 
     /* =====================================================================
-       7. EVENT WIRING
+       7. EVENT WIRING & INIT
        ===================================================================== */
     function attachAutoSaveListeners() {
-        // Avoid double binding if called more than once
         if (document.body._plannerBound) return;
         document.body._plannerBound = true;
 
@@ -308,26 +337,44 @@
         loadEntry(date);
     }
 
+    function setupLayoutToggle() {
+        const toggleBtn = document.getElementById("toggleLayout");
+        const spread = document.getElementById("spread");
+        if (!toggleBtn || !spread) return;
+
+        toggleBtn.addEventListener("click", () => {
+            const stacked = spread.classList.toggle("stacked");
+            toggleBtn.textContent = stacked
+                ? "Switch to Side-by-Side View"
+                : "Switch to Stacked View";
+        });
+    }
+
     function initPlanner() {
         const dateInput = document.getElementById("date-input");
         const addTaskBtn = document.getElementById("add-task");
 
-        // Initialize date
+        // Initialize date to today if empty
         const today = new Date().toISOString().slice(0, 10);
-        const activeDate = dateInput?.value || today;
+        let activeDate = today;
         if (dateInput) {
-            dateInput.value = activeDate;
+            if (!dateInput.value) {
+                dateInput.value = today;
+            }
+            activeDate = dateInput.value;
         }
 
         updateHeader(activeDate);
-        loadEntry(activeDate);
         attachAutoSaveListeners();
+        setupLayoutToggle();
 
+        // Date change handler
         if (dateInput && !dateInput._plannerHooked) {
             dateInput.addEventListener("change", onDateChange);
             dateInput._plannerHooked = true;
         }
 
+        // Add-task button
         if (addTaskBtn && !addTaskBtn._plannerHooked) {
             addTaskBtn.addEventListener("click", () => {
                 addBlankTask();
@@ -336,26 +383,26 @@
             addTaskBtn._plannerHooked = true;
         }
 
-        // Ensure some blank tasks if brand new
+        // Start with blanks before we know if server has data
         const list = document.getElementById("task-list");
         if (list && list.children.length === 0) {
             for (let i = 0; i < 6; i++) addBlankTask();
         }
+
+        // Finally, load from server (will overwrite blanks if data exists)
+        loadEntry(activeDate);
     }
 
     document.addEventListener("DOMContentLoaded", initPlanner);
 
     /* =====================================================================
-       8. EXPOSE GLOBALS (so existing inline code can still call them)
+       8. OPTIONAL: expose a few functions on window (for debugging)
        ===================================================================== */
     window.collectPlannerState = collectPlannerState;
     window.saveEntryDebounced = saveEntryDebounced;
     window.saveEntry = saveEntry;
     window.loadEntry = loadEntry;
     window.addBlankTask = addBlankTask;
-    window.attachAutoSaveListeners = attachAutoSaveListeners;
-    window.onDateChange = onDateChange;
     window.updateHeader = updateHeader;
-    window.renderMiniCalendar = renderMiniCalendar;
     window.renderAllCalendars = renderAllCalendars;
 })();
