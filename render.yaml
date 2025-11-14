@@ -1,0 +1,7 @@
+
+services:
+  - type: web
+    name: franklin-planner
+    env: python
+    buildCommand: ""
+    startCommand: "gunicorn app:app"
