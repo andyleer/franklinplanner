@@ -3,7 +3,7 @@ services:
     name: franklin-planner
     env: python
     build:
-      pythonVersion: 3.12.4       # <-- Add this line
+      pythonVersion: 3.12.4
     buildCommand: ""
     startCommand: "gunicorn app:app"
     envVars:
