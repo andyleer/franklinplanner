@@ -349,13 +349,32 @@
 
             phoneBtn.textContent = isPhone ? "Exit Phone View" : "Phone View";
 
-            // When entering phone view, force stacked spread (looks better on narrow screens)
-            if (spread) {
-                if (isPhone) {
-                    spread.classList.add("stacked");
-                }
+            // When entering phone view, force stacked spread
+            if (spread && isPhone) {
+                spread.classList.add("stacked");
             }
         });
+    }
+
+    // Auto-enable phone view on mobile / small screens
+    function autoEnablePhoneViewIfMobile() {
+        const isSmallScreen = window.innerWidth <= 800;
+        const ua = navigator.userAgent || "";
+        const isMobileUA = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
+
+        if (isSmallScreen || isMobileUA) {
+            const body = document.body;
+            const spread = document.getElementById("spread");
+            const phoneBtn = document.getElementById("phoneViewBtn");
+
+            body.classList.add("phone-view");
+            if (spread) {
+                spread.classList.add("stacked");
+            }
+            if (phoneBtn) {
+                phoneBtn.textContent = "Exit Phone View";
+            }
+        }
     }
 
     /* =====================================================================
@@ -393,6 +412,7 @@
         attachAutoSaveListeners();
         setupLayoutToggle();
         setupPhoneViewToggle();
+        autoEnablePhoneViewIfMobile();
 
         // Date change handler
         if (dateInput && !dateInput._plannerHooked) {
