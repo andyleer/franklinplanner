@@ -90,7 +90,7 @@
                 });
             }
 
-            // If nothing in DB, or tasks array empty, create 6 blank rows
+            // If no tasks at all, create 6 blank rows
             if (list.children.length === 0) {
                 for (let i = 0; i < 6; i++) addBlankTask();
             }
@@ -139,11 +139,10 @@
                 return;
             }
 
-            const json = await res.json();
+            const json = await res.json().catch(() => ({}));
             if (json && (json.status === "ok" || json.status === "saved" || json.id)) {
                 showSavedIndicator();
             } else {
-                // still show: POST succeeded
                 showSavedIndicator();
             }
         } catch (err) {
@@ -197,11 +196,10 @@
                 return;
             }
 
-            const data = await res.json() || {};
-            applyPlannerState(data);
+            const data = await res.json().catch(() => ({}));
+            applyPlannerState(data || {});
         } catch (err) {
             console.error("Load error:", err);
-            // fall back to empty
             applyPlannerState({
                 tasks: [],
                 tracker: "",
@@ -268,7 +266,6 @@
 
         container.innerHTML = "";
 
-        // Let JS normalize months like m-1, m+1
         const shownDate = new Date(year, month, 1);
         const shownYear = shownDate.getFullYear();
         const shownMonth = shownDate.getMonth();
@@ -320,7 +317,49 @@
     }
 
     /* =====================================================================
-       7. EVENT WIRING & INIT
+       7. LAYOUT TOGGLES
+       ===================================================================== */
+    function setupLayoutToggle() {
+        const toggleBtn = document.getElementById("toggleLayout");
+        const spread = document.getElementById("spread");
+        if (!toggleBtn || !spread) return;
+
+        if (toggleBtn._plannerHooked) return;
+        toggleBtn._plannerHooked = true;
+
+        toggleBtn.addEventListener("click", () => {
+            const stacked = spread.classList.toggle("stacked");
+            toggleBtn.textContent = stacked
+                ? "Switch to Side-by-Side View"
+                : "Switch to Stacked View";
+        });
+    }
+
+    function setupPhoneViewToggle() {
+        const phoneBtn = document.getElementById("phoneViewBtn");
+        const spread = document.getElementById("spread");
+        if (!phoneBtn) return;
+
+        if (phoneBtn._plannerHooked) return;
+        phoneBtn._plannerHooked = true;
+
+        phoneBtn.addEventListener("click", () => {
+            const body = document.body;
+            const isPhone = body.classList.toggle("phone-view");
+
+            phoneBtn.textContent = isPhone ? "Exit Phone View" : "Phone View";
+
+            // When entering phone view, force stacked spread (looks better on narrow screens)
+            if (spread) {
+                if (isPhone) {
+                    spread.classList.add("stacked");
+                }
+            }
+        });
+    }
+
+    /* =====================================================================
+       8. EVENT WIRING & INIT
        ===================================================================== */
     function attachAutoSaveListeners() {
         if (document.body._plannerBound) return;
@@ -337,24 +376,10 @@
         loadEntry(date);
     }
 
-    function setupLayoutToggle() {
-        const toggleBtn = document.getElementById("toggleLayout");
-        const spread = document.getElementById("spread");
-        if (!toggleBtn || !spread) return;
-
-        toggleBtn.addEventListener("click", () => {
-            const stacked = spread.classList.toggle("stacked");
-            toggleBtn.textContent = stacked
-                ? "Switch to Side-by-Side View"
-                : "Switch to Stacked View";
-        });
-    }
-
     function initPlanner() {
         const dateInput = document.getElementById("date-input");
         const addTaskBtn = document.getElementById("add-task");
 
-        // Initialize date to today if empty
         const today = new Date().toISOString().slice(0, 10);
         let activeDate = today;
         if (dateInput) {
@@ -367,6 +392,7 @@
         updateHeader(activeDate);
         attachAutoSaveListeners();
         setupLayoutToggle();
+        setupPhoneViewToggle();
 
         // Date change handler
         if (dateInput && !dateInput._plannerHooked) {
@@ -383,20 +409,20 @@
             addTaskBtn._plannerHooked = true;
         }
 
-        // Start with blanks before we know if server has data
+        // Ensure blank rows exist before loading
         const list = document.getElementById("task-list");
         if (list && list.children.length === 0) {
             for (let i = 0; i < 6; i++) addBlankTask();
         }
 
-        // Finally, load from server (will overwrite blanks if data exists)
+        // Finally load data for the active date
         loadEntry(activeDate);
     }
 
     document.addEventListener("DOMContentLoaded", initPlanner);
 
     /* =====================================================================
-       8. OPTIONAL: expose a few functions on window (for debugging)
+       9. Expose for debugging in console
        ===================================================================== */
     window.collectPlannerState = collectPlannerState;
     window.saveEntryDebounced = saveEntryDebounced;
