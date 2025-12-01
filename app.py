@@ -1,187 +1,115 @@
-import os
-import datetime as dt
+# app.py - FULL WORKING VERSION WITH USERS + LOGIN
+# -------------------------------------------------------------
 
-from flask import (
-    Flask,
-    request,
-    jsonify,
-    send_from_directory,
-    session,
-)
+from flask import Flask, request, jsonify, session, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
-
-# ------------------------------------------------------------------------------
-# App + DB setup
-# ------------------------------------------------------------------------------
+import os
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 
-# Secret key for sessions (set a strong one in Render)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-me-in-prod")
+# --------------------------------------------------------------------
+# CONFIG
+# --------------------------------------------------------------------
+app.secret_key = os.environ.get("SECRET_KEY", "dev_secret_key")
 
-# Render / Heroku style DATABASE_URL handling
-db_url = os.environ.get("DATABASE_URL")
-if db_url and db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
+# Render provides DATABASE_URL; local dev uses SQLite
+db_url = os.environ.get("DATABASE_URL", "sqlite:///local.db")
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://")
 
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
+CORS(app, supports_credentials=True)
 
-# ------------------------------------------------------------------------------
-# Models
-# ------------------------------------------------------------------------------
+
+# --------------------------------------------------------------------
+# DATABASE MODELS
+# --------------------------------------------------------------------
 
 class User(db.Model):
     __tablename__ = "users"
-
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(255), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, default=dt.datetime.utcnow)
+    email = db.Column(db.String(255), unique=True)
+    password_hash = db.Column(db.String(255))
 
 
 class Day(db.Model):
     __tablename__ = "days"
-
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(
-        db.Integer,
-        db.ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
-    )
-    date = db.Column(db.Date, nullable=False)
-    tracker = db.Column(db.Text, default="")
-    notes = db.Column(db.Text, default="")
-
-    tasks = db.relationship(
-        "Task",
-        backref="day",
-        cascade="all, delete-orphan",
-        lazy=True,
-    )
-    appointments = db.relationship(
-        "Appointment",
-        backref="day",
-        cascade="all, delete-orphan",
-        lazy=True,
-    )
-
-    __table_args__ = (
-        db.UniqueConstraint("user_id", "date", name="uq_days_user_date"),
-    )
+    date = db.Column(db.String(50))
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    notes = db.Column(db.Text)
+    tracker = db.Column(db.Text)
 
 
 class Task(db.Model):
     __tablename__ = "tasks"
-
     id = db.Column(db.Integer, primary_key=True)
-    day_id = db.Column(
-        db.Integer,
-        db.ForeignKey("days.id", ondelete="CASCADE"),
-        nullable=False,
-    )
+    day_id = db.Column(db.Integer, db.ForeignKey("days.id"))
+    priority = db.Column(db.String(2))
+    description = db.Column(db.Text)
     checked = db.Column(db.Boolean, default=False)
-    priority = db.Column(db.String(1), default="A")
-    description = db.Column(db.Text, default="")
 
 
 class Appointment(db.Model):
     __tablename__ = "appointments"
-
     id = db.Column(db.Integer, primary_key=True)
-    day_id = db.Column(
-        db.Integer,
-        db.ForeignKey("days.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    time_label = db.Column(db.String(20), nullable=False)  # e.g. "7", "8", "9"
-    text = db.Column(db.Text, default="")
+    day_id = db.Column(db.Integer, db.ForeignKey("days.id"))
+    time = db.Column(db.String(20))
+    text = db.Column(db.Text)
 
 
-# ------------------------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------------------------
-
-def get_current_user():
-    """Return the logged-in user object or None."""
-    user_id = session.get("user_id")
-    if not user_id:
-        return None
-    return User.query.get(user_id)
-
-
+# --------------------------------------------------------------------
+# HELPER – REQUIRE LOGIN
+# --------------------------------------------------------------------
 def require_user():
-    """Return (user, error_response) so we can early-out if not logged in."""
-    user = get_current_user()
-    if not user:
-        return None, (jsonify({"error": "Not logged in"}), 401)
-    return user, None
+    uid = session.get("user_id")
+    if not uid:
+        return None
+    return User.query.get(uid)
 
 
-# ------------------------------------------------------------------------------
-# Auth routes (JSON-based)
-# ------------------------------------------------------------------------------
+# --------------------------------------------------------------------
+# AUTH ROUTES
+# --------------------------------------------------------------------
 
-@app.post("/api/register")
-def register():
-    """
-    JSON: { "email": "...", "password": "..." }
-    Creates a user and logs them in.
-    """
-    data = request.get_json(silent=True) or {}
-    email = (data.get("email") or "").strip().lower()
-    password = data.get("password") or ""
+@app.post("/api/signup")
+def signup():
+    data = request.json
+    email = data.get("email")
+    pw = data.get("password")
 
-    if not email or not password:
-        return jsonify({"error": "Email and password required"}), 400
+    if User.query.filter_by(email=email).first():
+        return jsonify({"error": "Email already exists"}), 400
 
-    existing = User.query.filter_by(email=email).first()
-    if existing:
-        return jsonify({"error": "Email already registered"}), 400
-
-    pw_hash = generate_password_hash(password)
-    user = User(email=email, password_hash=pw_hash)
+    user = User(
+        email=email,
+        password_hash=generate_password_hash(pw)
+    )
     db.session.add(user)
     db.session.commit()
 
     session["user_id"] = user.id
 
-    return jsonify(
-        {
-            "status": "ok",
-            "user": {"id": user.id, "email": user.email},
-        }
-    )
+    return jsonify({"status": "ok", "user_id": user.id})
 
 
 @app.post("/api/login")
 def login():
-    """
-    JSON: { "email": "...", "password": "..." }
-    Logs the user in by setting session["user_id"].
-    """
-    data = request.get_json(silent=True) or {}
-    email = (data.get("email") or "").strip().lower()
-    password = data.get("password") or ""
-
-    if not email or not password:
-        return jsonify({"error": "Email and password required"}), 400
+    data = request.json
+    email = data.get("email")
+    pw = data.get("password")
 
     user = User.query.filter_by(email=email).first()
-    if not user or not check_password_hash(user.password_hash, password):
-        return jsonify({"error": "Invalid email or password"}), 401
+    if not user or not check_password_hash(user.password_hash, pw):
+        return jsonify({"error": "Invalid login"}), 401
 
     session["user_id"] = user.id
-
-    return jsonify(
-        {
-            "status": "ok",
-            "user": {"id": user.id, "email": user.email},
-        }
-    )
+    return jsonify({"status": "ok", "user_id": user.id})
 
 
 @app.post("/api/logout")
@@ -190,167 +118,129 @@ def logout():
     return jsonify({"status": "ok"})
 
 
-@app.get("/api/me")
-def me():
-    user = get_current_user()
+# --------------------------------------------------------------------
+# LOAD DAY ENTRY
+# --------------------------------------------------------------------
+@app.get("/api/day/<date>")
+def get_day(date):
+    user = require_user()
     if not user:
-        return jsonify({"user": None})
-    return jsonify({"user": {"id": user.id, "email": user.email}})
+        return jsonify({"error": "unauthorized"}), 401
 
-
-# ------------------------------------------------------------------------------
-# Planner API – per-user via session
-# ------------------------------------------------------------------------------
-
-@app.route("/api/day/<date_str>", methods=["GET", "POST"])
-def day_endpoint(date_str):
-    """
-    GET  /api/day/YYYY-MM-DD  -> load planner state for that user + date
-    POST /api/day/YYYY-MM-DD  -> save planner state for that user + date
-
-    Planner JSON schema (what your planner.js already uses):
-
-    {
-      "date": "YYYY-MM-DD",
-      "tasks": [
-        {"checked": bool, "priority": "A"/"B"/"C", "description": "..."},
-        ...
-      ],
-      "tracker": "text",
-      "appointments": [
-        {"time": "7", "text": "..."},
-        ...
-      ],
-      "notes": "text"
-    }
-    """
-    user, err = require_user()
-    if err:
-        return err
-
-    # Parse date string
-    try:
-        date_obj = dt.date.fromisoformat(date_str)
-    except ValueError:
-        return jsonify({"error": "Invalid date format"}), 400
-
-    if request.method == "GET":
-        day = Day.query.filter_by(user_id=user.id, date=date_obj).first()
-        if not day:
-            # No saved entry yet; let front-end fall back to blanks
-            return jsonify(
-                {
-                    "date": date_str,
-                    "tasks": [],
-                    "tracker": "",
-                    "appointments": [],
-                    "notes": "",
-                }
-            ), 200
-
-        tasks_data = [
-            {
-                "checked": t.checked,
-                "priority": t.priority or "A",
-                "description": t.description or "",
-            }
-            for t in day.tasks
-        ]
-
-        appt_data = [
-            {
-                "time": a.time_label,
-                "text": a.text or "",
-            }
-            for a in day.appointments
-        ]
-
-        return jsonify(
-            {
-                "date": date_str,
-                "tasks": tasks_data,
-                "tracker": day.tracker or "",
-                "appointments": appt_data,
-                "notes": day.notes or "",
-            }
-        )
-
-    # POST – save/update
-    payload = request.get_json(silent=True) or {}
-
-    tracker = payload.get("tracker") or ""
-    notes = payload.get("notes") or ""
-    tasks_payload = payload.get("tasks") or []
-    appts_payload = payload.get("appointments") or []
-
-    # Get or create Day row
-    day = Day.query.filter_by(user_id=user.id, date=date_obj).first()
+    # Does this day exist?
+    day = Day.query.filter_by(date=date, user_id=user.id).first()
     if not day:
-        day = Day(user_id=user.id, date=date_obj)
+        # Empty response
+        return jsonify({
+            "date": date,
+            "tasks": [],
+            "appointments": [],
+            "tracker": "",
+            "notes": ""
+        })
+
+    # Load tasks & appointments
+    tasks = Task.query.filter_by(day_id=day.id).all()
+    appts = Appointment.query.filter_by(day_id=day.id).all()
+
+    return jsonify({
+        "date": day.date,
+        "notes": day.notes or "",
+        "tracker": day.tracker or "",
+        "tasks": [
+            {
+                "id": t.id,
+                "priority": t.priority,
+                "description": t.description,
+                "checked": t.checked,
+            }
+            for t in tasks
+        ],
+        "appointments": [
+            {"time": a.time, "text": a.text}
+            for a in appts
+        ]
+    })
+
+
+# --------------------------------------------------------------------
+# SAVE DAY ENTRY
+# --------------------------------------------------------------------
+@app.post("/api/day/<date>")
+def save_day(date):
+    user = require_user()
+    if not user:
+        return jsonify({"error": "unauthorized"}), 401
+
+    data = request.json
+
+    # Find or create the day row
+    day = Day.query.filter_by(date=date, user_id=user.id).first()
+    if not day:
+        day = Day(date=date, user_id=user.id)
         db.session.add(day)
+        db.session.commit()
 
-    day.tracker = tracker
-    day.notes = notes
+    # Update top-level fields
+    day.notes = data.get("notes", "")
+    day.tracker = data.get("tracker", "")
+    db.session.commit()
 
-    # Clear existing tasks & appointments
+    # Clear tasks/appointments for clean overwrite
     Task.query.filter_by(day_id=day.id).delete()
     Appointment.query.filter_by(day_id=day.id).delete()
+    db.session.commit()
 
-    # Recreate tasks
-    for t in tasks_payload:
-        priority = (t.get("priority") or "A").upper()
-        if priority not in ("A", "B", "C"):
-            priority = "A"
-        checked = bool(t.get("checked"))
-        desc = t.get("description") or ""
-        db.session.add(
-            Task(
-                day=day,
-                checked=checked,
-                priority=priority,
-                description=desc,
-            )
+    # Rewrite tasks
+    for t in data.get("tasks", []):
+        task = Task(
+            day_id=day.id,
+            priority=t.get("priority", "A"),
+            description=t.get("description", ""),
+            checked=t.get("checked", False)
         )
+        db.session.add(task)
 
-    # Recreate appointments
-    for a in appts_payload:
-        time_label = (a.get("time") or "").strip()
-        text = a.get("text") or ""
-        if not time_label:
-            continue
-        db.session.add(
-            Appointment(
-                day=day,
-                time_label=time_label,
-                text=text,
-            )
+    # Rewrite appointments
+    for a in data.get("appointments", []):
+        appt = Appointment(
+            day_id=day.id,
+            time=a.get("time", ""),
+            text=a.get("text", "")
         )
+        db.session.add(appt)
 
     db.session.commit()
 
-    return jsonify({"status": "ok", "date": date_str})
-
-
-# ------------------------------------------------------------------------------
-# Health & static
-# ------------------------------------------------------------------------------
-
-@app.get("/health")
-def health():
     return jsonify({"status": "ok"})
 
 
-# (Optional) serve index.html if you're hitting this via / in the browser
+# --------------------------------------------------------------------
+# STATIC ROUTE (SERVE FRONTEND)
+# --------------------------------------------------------------------
+
 @app.get("/")
 def index():
-    # If your index.html is at project root with this app.py
     return send_from_directory(".", "index.html")
 
 
-# ------------------------------------------------------------------------------
-# Main entry for local dev
-# ------------------------------------------------------------------------------
+@app.get("/planner.js")
+def jsfile():
+    return send_from_directory(".", "planner.js")
+
+
+# --------------------------------------------------------------------
+
+@app.get("/health")
+def health():
+    return "OK", 200
+
+
+# --------------------------------------------------------------------
+# INIT
+# --------------------------------------------------------------------
+with app.app_context():
+    db.create_all()
 
 if __name__ == "__main__":
-    # For local testing only; Render uses gunicorn
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000)
