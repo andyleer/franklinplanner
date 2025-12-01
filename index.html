@@ -3,20 +3,67 @@
 <head>
 <meta charset="UTF-8" />
 <title>Franklin Planner</title>
-
-<!-- Make mobile use full width / zoomed in -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-/* GLOBAL */
+/* ---------------------------
+   GLOBAL
+---------------------------- */
 body {
     background: #f5f7f6;
-    font-family: "Franklin Gothic Medium", "Arial Narrow", Arial, sans-serif;
+    font-family: "Franklin Gothic Medium", Arial, sans-serif;
     color: #003b3b;
     margin: 0;
 }
 
-/* Top controls */
+/* Centered auth container */
+#auth-container {
+    max-width: 360px;
+    margin: 4rem auto;
+    padding: 2rem;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #c4d1ce;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+#auth-container h2 {
+    margin-top: 0;
+}
+.auth-input {
+    width: 100%;
+    padding: 0.5rem;
+    margin: 0.4rem 0;
+    border: 1px solid #b6c7c6;
+    border-radius: 4px;
+}
+.auth-btn {
+    width: 100%;
+    padding: 0.6rem;
+    margin-top: 0.6rem;
+    border: none;
+    background: #003b3b;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.auth-btn:hover {
+    background: #065353;
+}
+.auth-link {
+    color: #003b3b;
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+/* Hide planner until logged in */
+#planner-app {
+    display: none;
+}
+
+/* ---------------------------
+   CONTROL BUTTONS
+---------------------------- */
 .controls {
     text-align: center;
     padding: 0.75rem 0 0;
@@ -37,7 +84,9 @@ body {
     background: #d4e9e7;
 }
 
-/* Spread – two pages */
+/* ---------------------------
+   PLANNER LAYOUT
+---------------------------- */
 .spread {
     display: flex;
     justify-content: center;
@@ -50,7 +99,6 @@ body {
     align-items: center;
 }
 
-/* PAGE */
 .page {
     width: 540px;
     height: 750px;
@@ -64,7 +112,6 @@ body {
     flex-direction: column;
 }
 
-/* PAGE BODY (2 columns) */
 .page-body {
     display: grid;
     grid-template-columns: 1.2fr 1.2fr;
@@ -72,14 +119,14 @@ body {
     gap: 1.6rem;
 }
 
-/* LEFT + RIGHT columns */
-.left-column,
-.right-column {
+.left-column, .right-column {
     display: flex;
     flex-direction: column;
 }
 
-/* DATE ROW */
+/* ---------------------------
+   DATE HEADER
+---------------------------- */
 .date-row {
     display: flex;
     align-items: flex-start;
@@ -88,71 +135,57 @@ body {
 .day-number {
     font-size: 2.8rem;
     font-weight: 700;
-    line-height: 1;
 }
 .weekday {
     font-size: 1rem;
-    letter-spacing: 0.06em;
     text-transform: uppercase;
-    margin-top: 0.25rem;
 }
 .month-year {
     font-size: 0.85rem;
-    letter-spacing: 0.04em;
     text-transform: uppercase;
     color: #305f5f;
 }
 .date-picker-label {
     font-size: 0.75rem;
-    margin-top: 0.25rem;
-    color: #4e7170;
 }
 .date-picker-label input {
     font-size: 0.75rem;
-    padding: 0.1rem 0.3rem;
-    border-radius: 3px;
-    border: 1px solid #b0c4c3;
 }
 
-/* MINICALS */
+/* ---------------------------
+   MINI CALENDARS
+---------------------------- */
 .mini-calendar-row {
     display: flex;
     gap: 0.5rem;
     margin-top: 0.5rem;
     margin-bottom: 0.5rem;
 }
-.mini-calendar-small,
-#mini-current {
+.mini-calendar-small, #mini-current {
     background: #fff;
     border: 1px solid #c4d1ce;
     border-radius: 4px;
     padding: 0.25rem;
     font-size: 0.65rem;
 }
-#mini-current {
-    margin-bottom: 0.75rem;
-}
 .mini-cal-title {
     text-align: center;
     font-weight: bold;
     font-size: 0.75rem;
-    margin-bottom: 0.2rem;
 }
 .mini-cal-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(7,1fr);
     text-align: center;
-}
-.mini-cal-grid div {
-    padding: 2px 0;
+    font-size: 0.65rem;
 }
 .weekday-label {
     font-weight: bold;
-    color: #406060;
-    font-size: 0.65rem;
 }
 
-/* SECTION TITLES */
+/* ---------------------------
+   SECTION TITLES
+---------------------------- */
 .section-title {
     padding-top: 10px;
     border-bottom: 1.5px solid #003b3b;
@@ -163,166 +196,103 @@ body {
     letter-spacing: 0.08em;
 }
 
-/* ABC TASK LIST */
+/* ---------------------------
+   TASK LIST
+---------------------------- */
 .task-row {
     display: grid;
     grid-template-columns: 0.4fr 0.7fr 6fr;
-    gap: 0.2rem;
-    padding: 0.08rem 0;
     border-bottom: 0.5px solid #c3d2d0;
-}
-.task-row input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-}
-.task-row select {
-    width: 180%;
-    font-size: 0.75rem;
 }
 .task-desc input {
     width: 100%;
     border: none;
     background: transparent;
-    font-size: 0.8rem;
-    padding-left: 1rem;
 }
-.task-desc input:focus { outline: none; }
-
 .small-btn {
     margin-top: 0.3rem;
-    padding: 0.2rem 0.6rem;
-    font-size: 0.75rem;
-    border-radius: 3px;
-    border: 1px solid #305f5f;
-    color: #305f5f;
-    background: transparent;
-    cursor: pointer;
-}
-.small-btn:hover {
-    background: rgba(48,95,95,0.08);
 }
 
-/* DAILY TRACKER */
-.tracker-wrapper {
-    border: 1px solid #c3d2d0;
-    background: repeating-linear-gradient(
-        to bottom,
-        #ffffff 0,
-        #ffffff 18px,
-        #c3d2d0 19px,
-        #ffffff 20px
-    );
-    margin-top: 0.3rem;
-}
-.tracker-textarea {
-    width: 100%;
-    min-height: 170px;
-    border: none;
-    background: transparent;
-    font-size: 0.8rem;
-    padding: 0.4rem;
-    box-sizing: border-box;
-}
-.tracker-textarea:focus { outline: none; }
-
-/* APPOINTMENTS */
-.appt-list {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-.appt-row {
-    display: grid;
-    grid-template-columns: 0.5fr auto;
-    border-bottom: 0.5px solid #c3d2d0;
-    padding: 0.1rem 0;
-}
-.appt-time {
-    font-weight: bold;
-    font-size: 0.8rem;
-}
-.appt-input {
-    border: none;
-    background: transparent;
-    font-size: 0.8rem;
-}
-.appt-input:focus { outline: none; }
-
-/* NOTES PAGE */
+/* ---------------------------
+   NOTES & TRACKER
+---------------------------- */
+.tracker-wrapper,
 .notes-wrapper {
     border: 1px solid #c3d2d0;
-    flex: 1;
-    background: repeating-linear-gradient(
-        to bottom,
+    background: repeating-linear-gradient(to bottom,
         #ffffff 0,
         #ffffff 18px,
         #c3d2d0 19px,
-        #ffffff 20px
-    );
+        #ffffff 20px);
 }
+.tracker-textarea,
 .notes-textarea {
     width: 100%;
-    height: 100%;
-    padding: 0.5rem;
     border: none;
     background: transparent;
-    font-size: 0.8rem;
     box-sizing: border-box;
 }
-.notes-textarea:focus { outline: none; }
 
-/* =========================
-   PHONE VIEW MODE
-   ========================= */
+/* ---------------------------
+   PHONE MODE
+---------------------------- */
 body.phone-view .spread {
     flex-direction: column;
     align-items: stretch;
-    padding: 0.25rem;
 }
-
-/* Use as much width as possible on phone */
 body.phone-view .page {
     width: 100%;
-    max-width: 100%;
+    max-width: 420px;
     height: auto;
-    margin: 0 0 0.75rem 0;
-    border-radius: 0;
-    box-shadow: none;
-    padding: 0.75rem 0.75rem 1rem;
+    margin-bottom: 1rem;
 }
-
-/* Stack columns vertically in phone view */
 body.phone-view .page-body {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-}
-
-body.phone-view .left-column,
-body.phone-view .right-column {
-    width: 100%;
-}
-
-/* Slightly tighter headings on phone */
-body.phone-view .section-title {
-    padding-top: 6px;
-}
-
-/* On small screens, default to stacked spread (desktop pages but vertical) */
-@media (max-width: 768px) {
-    .spread {
-        flex-direction: column;
-        align-items: center;
-    }
 }
 </style>
 </head>
-
 <body>
 
+<!-- ============================================
+     LOGIN / SIGNUP SCREEN
+================================================ -->
+<div id="auth-container">
+    <h2>Sign In</h2>
+    <input id="login-email" placeholder="Email" class="auth-input">
+    <input id="login-pass" placeholder="Password" type="password" class="auth-input">
+
+    <button id="loginBtn" class="auth-btn">Log In</button>
+
+    <div style="margin-top: 0.8rem;">
+        <span class="auth-link" id="showSignup">Create an account</span>
+    </div>
+</div>
+
+<!-- SIGNUP -->
+<div id="signup-container" style="display:none;">
+    <div id="auth-container">
+        <h2>Create Account</h2>
+        <input id="signup-email" placeholder="Email" class="auth-input">
+        <input id="signup-pass" type="password" placeholder="Password" class="auth-input">
+        <button id="signupBtn" class="auth-btn">Create Account</button>
+
+        <div style="margin-top: 0.8rem;">
+            <span class="auth-link" id="showLogin">Back to login</span>
+        </div>
+    </div>
+</div>
+
+
+<!-- ============================================
+     MAIN PLANNER APP (hidden until login)
+================================================ -->
+<div id="planner-app">
+
 <div class="controls">
-    <button id="toggleLayout">Switch to Stacked View</button>
+    <button id="toggleLayout">Stacked View</button>
     <button id="phoneViewBtn">Phone View</button>
+    <button id="logoutBtn" style="background:#a02f2f;color:white;">Logout</button>
 </div>
 
 <div id="spread" class="spread">
@@ -334,13 +304,11 @@ body.phone-view .section-title {
             <!-- LEFT COLUMN -->
             <div class="left-column">
 
-                <!-- DATE BLOCK -->
                 <div class="date-row">
                     <div class="day-number" id="day-number"></div>
                     <div>
                         <div class="weekday" id="weekday"></div>
                         <div class="month-year" id="month-year"></div>
-
                         <label class="date-picker-label">
                             Date:
                             <input type="date" id="date-input">
@@ -348,32 +316,27 @@ body.phone-view .section-title {
                     </div>
                 </div>
 
-                <!-- PREV / NEXT MINICALS -->
                 <div class="mini-calendar-row">
                     <div id="mini-prev" class="mini-calendar-small"></div>
                     <div id="mini-next" class="mini-calendar-small"></div>
                 </div>
 
-                <!-- ABC TASK LIST -->
                 <div class="section-title">ABC PRIORITIZED DAILY TASK LIST</div>
                 <div id="task-list"></div>
                 <button class="small-btn" id="add-task">+ Add Task</button>
 
-                <!-- DAILY TRACKER -->
                 <div class="section-title">DAILY TRACKER</div>
                 <div class="tracker-wrapper">
                     <textarea id="tracker" class="tracker-textarea"></textarea>
                 </div>
+
             </div>
 
-            <!-- RIGHT COLUMN -->
+            <!-- RIGHT -->
             <div class="right-column">
-                <!-- CURRENT MONTH MINI CAL -->
                 <div id="mini-current"></div>
 
-                <!-- APPOINTMENTS -->
                 <div class="section-title">APPOINTMENT SCHEDULE</div>
-
                 <div class="appt-list">
                     <div class="appt-row"><div class="appt-time">7</div><input class="appt-input"></div>
                     <div class="appt-row"><div class="appt-time">8</div><input class="appt-input"></div>
@@ -395,7 +358,7 @@ body.phone-view .section-title {
         </div>
     </div>
 
-    <!-- RIGHT PAGE – NOTES -->
+    <!-- NOTES PAGE -->
     <div class="page">
         <div class="section-title">NOTES</div>
         <div class="notes-wrapper">
@@ -404,6 +367,7 @@ body.phone-view .section-title {
     </div>
 
 </div>
+</div> <!-- END planner-app -->
 
 <script src="planner.js"></script>
 
