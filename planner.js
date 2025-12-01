@@ -1,15 +1,62 @@
 // planner.js
-// Franklin-style daily planner front-end logic
-// Backend endpoints:
-//   GET  /api/day/<YYYY-MM-DD>
-//   POST /api/day/<YYYY-MM-DD>
+// Franklin-style planner client-side logic (now with login + per-user data)
 
 (function () {
     "use strict";
 
-    /* =====================================================================
-       1. UTIL – Get active date (YYYY-MM-DD)
-       ===================================================================== */
+    /* -------------------------------------------------------------
+       1. LOGIN HANDLING
+    ------------------------------------------------------------- */
+
+    async function checkLogin() {
+        try {
+            const res = await fetch("/me");
+            if (!res.ok) return showLoginScreen();
+
+            const user = await res.json();
+            if (!user || !user.username) return showLoginScreen();
+
+            document.getElementById("login-container").style.display = "none";
+            document.getElementById("app-container").style.display = "block";
+            return initPlanner();
+        } catch (err) {
+            console.error("Login check failed:", err);
+            showLoginScreen();
+        }
+    }
+
+    function showLoginScreen() {
+        document.getElementById("login-container").style.display = "block";
+        document.getElementById("app-container").style.display = "none";
+    }
+
+    async function handleLogin(e) {
+        e.preventDefault();
+
+        const username = document.getElementById("login-username").value.trim();
+        const password = document.getElementById("login-password").value.trim();
+
+        const res = await fetch("/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+        });
+
+        if (res.ok) {
+            checkLogin();
+        } else {
+            alert("Login failed. Check username/password.");
+        }
+    }
+
+    async function handleLogout() {
+        await fetch("/logout", { method: "POST" });
+        showLoginScreen();
+    }
+
+    /* -------------------------------------------------------------
+       2. UTIL – Get active date
+    ------------------------------------------------------------- */
     function getActiveDate() {
         const dateInput = document.getElementById("date-input");
         const today = new Date().toISOString().slice(0, 10);
@@ -17,136 +64,102 @@
         return dateInput.value || today;
     }
 
-    /* =====================================================================
-       2. COLLECT + APPLY STATE
-       ===================================================================== */
+    /* -------------------------------------------------------------
+       3. COLLECT + APPLY STATE
+    ------------------------------------------------------------- */
     function collectPlannerState() {
         const tasks = Array.from(
             document.querySelectorAll("#task-list .task-row")
-        ).map(row => {
-            const checkbox = row.querySelector("input[type='checkbox']");
-            const select = row.querySelector("select");
-            const descInput = row.querySelector(".task-desc input");
-
-            return {
-                checked: checkbox ? checkbox.checked : false,
-                priority: select ? select.value : "A",
-                description: descInput ? descInput.value : ""
-            };
-        });
+        ).map(row => ({
+            checked: row.querySelector("input[type='checkbox']").checked,
+            priority: row.querySelector("select").value,
+            description: row.querySelector(".task-desc input").value
+        }));
 
         const appointments = Array.from(
             document.querySelectorAll(".appt-row")
-        ).map(row => {
-            const timeEl = row.querySelector(".appt-time");
-            const input = row.querySelector(".appt-input");
-            return {
-                time: timeEl ? timeEl.textContent.trim() : "",
-                text: input ? input.value : ""
-            };
-        });
+        ).map(row => ({
+            time: row.querySelector(".appt-time").textContent.trim(),
+            text: row.querySelector(".appt-input").value
+        }));
 
         return {
             date: getActiveDate(),
             tasks,
-            tracker: document.getElementById("tracker")?.value || "",
+            tracker: document.getElementById("tracker").value || "",
             appointments,
-            notes: document.getElementById("notes")?.value || ""
+            notes: document.getElementById("notes").value || ""
         };
     }
 
     function applyPlannerState(data) {
-        const tasks = Array.isArray(data.tasks) ? data.tasks : [];
-        const appointments = Array.isArray(data.appointments) ? data.appointments : [];
-
-        // ----- Tasks -----
+        /* ----- TASKS ----- */
         const list = document.getElementById("task-list");
-        if (list) {
-            list.innerHTML = "";
+        list.innerHTML = "";
 
-            if (tasks.length > 0) {
-                tasks.forEach(t => {
-                    const row = document.createElement("div");
-                    row.className = "task-row";
-
-                    const safeDesc = (t.description || "")
-                        .replace(/&/g, "&amp;")
-                        .replace(/"/g, "&quot;")
-                        .replace(/</g, "&lt;")
-                        .replace(/>/g, "&gt;");
-
-                    row.innerHTML = `
-                        <input type="checkbox" ${t.checked ? "checked" : ""}>
-                        <select>
-                            <option ${t.priority === "A" ? "selected" : ""}>A</option>
-                            <option ${t.priority === "B" ? "selected" : ""}>B</option>
-                            <option ${t.priority === "C" ? "selected" : ""}>C</option>
-                        </select>
-                        <div class="task-desc">
-                            <input type="text" value="${safeDesc}">
-                        </div>
-                    `;
-                    list.appendChild(row);
-                });
-            }
-
-            // If no tasks at all, create 6 blank rows
-            if (list.children.length === 0) {
-                for (let i = 0; i < 6; i++) addBlankTask();
-            }
+        const tasks = data.tasks ?? [];
+        if (tasks.length === 0) {
+            for (let i = 0; i < 6; i++) addBlankTask();
+        } else {
+            tasks.forEach(t => {
+                const row = document.createElement("div");
+                row.className = "task-row";
+                const safe = (t.description || "")
+                    .replace(/&/g,"&amp;")
+                    .replace(/</g,"&lt;")
+                    .replace(/>/g,"&gt;")
+                    .replace(/"/g,"&quot;");
+                row.innerHTML = `
+                    <input type="checkbox" ${t.checked ? "checked" : ""}>
+                    <select>
+                        <option ${t.priority === "A" ? "selected":""}>A</option>
+                        <option ${t.priority === "B" ? "selected":""}>B</option>
+                        <option ${t.priority === "C" ? "selected":""}>C</option>
+                    </select>
+                    <div class="task-desc"><input type="text" value="${safe}"></div>
+                `;
+                list.appendChild(row);
+            });
         }
 
-        // ----- Tracker -----
-        const trackerEl = document.getElementById("tracker");
-        if (trackerEl) trackerEl.value = data.tracker || "";
+        /* ----- TRACKER ----- */
+        document.getElementById("tracker").value = data.tracker || "";
 
-        // ----- Appointments -----
+        /* ----- APPOINTMENTS ----- */
         const apptRows = document.querySelectorAll(".appt-row");
-        appointments.forEach((a, i) => {
+        (data.appointments ?? []).forEach((a, i) => {
             if (!apptRows[i]) return;
-            const input = apptRows[i].querySelector(".appt-input");
-            if (input) input.value = a.text || "";
+            apptRows[i].querySelector(".appt-input").value = a.text || "";
         });
 
-        // ----- Notes -----
-        const notesEl = document.getElementById("notes");
-        if (notesEl) notesEl.value = data.notes || "";
+        /* ----- NOTES ----- */
+        document.getElementById("notes").value = data.notes || "";
     }
 
-    /* =====================================================================
-       3. SAVE (with debounce) – uses /api/day/<date>
-       ===================================================================== */
+    /* -------------------------------------------------------------
+       4. SAVE (debounced)
+    ------------------------------------------------------------- */
     let saveTimer = null;
 
     function saveEntryDebounced() {
         clearTimeout(saveTimer);
-        saveTimer = setTimeout(saveEntry, 700);
+        saveTimer = setTimeout(saveEntry, 600);
     }
 
     async function saveEntry() {
         const state = collectPlannerState();
-        const date = state.date || new Date().toISOString().slice(0, 10);
+        const date = state.date;
 
         try {
             const res = await fetch(`/api/day/${date}`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type":"application/json" },
                 body: JSON.stringify(state)
             });
 
-            if (!res.ok) {
-                console.error("Save failed", res.status, await res.text());
-                return;
-            }
-
-            const json = await res.json().catch(() => ({}));
-            if (json && (json.status === "ok" || json.status === "saved" || json.id)) {
-                showSavedIndicator();
-            } else {
-                showSavedIndicator();
-            }
+            if (res.ok) showSavedIndicator();
         } catch (err) {
-            console.error("Save error:", err);
+            console.error("SAVE ERROR:",err);
         }
     }
 
@@ -156,299 +169,159 @@
             el = document.createElement("div");
             el.id = "saved-indicator";
             el.textContent = "Saved";
-            Object.assign(el.style, {
-                position: "fixed",
-                bottom: "20px",
-                right: "20px",
-                background: "#003b3b",
-                color: "#ffffff",
-                padding: "6px 12px",
-                borderRadius: "6px",
-                fontSize: "0.8rem",
-                opacity: "0",
-                transition: "opacity 0.25s ease",
-                zIndex: "9999"
+            Object.assign(el.style,{
+                position:"fixed", bottom:"20px", right:"20px",
+                padding:"6px 12px", background:"#003b3b",
+                color:"#fff", borderRadius:"6px",
+                transition:"opacity .3s", opacity:"0"
             });
             document.body.appendChild(el);
         }
         el.style.opacity = "1";
-        setTimeout(() => {
-            el.style.opacity = "0";
-        }, 1100);
+        setTimeout(()=> el.style.opacity="0",1000);
     }
 
-    /* =====================================================================
-       4. LOAD – uses /api/day/<date>
-       ===================================================================== */
+    /* -------------------------------------------------------------
+       5. LOAD ENTRY
+    ------------------------------------------------------------- */
     async function loadEntry(dateStr) {
         const date = dateStr || getActiveDate();
-
         try {
             const res = await fetch(`/api/day/${date}`);
-            if (!res.ok) {
-                console.warn("No saved entry for", date, "status:", res.status);
-                applyPlannerState({
-                    tasks: [],
-                    tracker: "",
-                    appointments: [],
-                    notes: ""
-                });
-                return;
-            }
-
-            const data = await res.json().catch(() => ({}));
-            applyPlannerState(data || {});
+            const data = res.ok ? await res.json() : {};
+            applyPlannerState(data);
         } catch (err) {
             console.error("Load error:", err);
-            applyPlannerState({
-                tasks: [],
-                tracker: "",
-                appointments: [],
-                notes: ""
-            });
+            applyPlannerState({});
         }
     }
 
-    /* =====================================================================
-       5. TASK ROWS
-       ===================================================================== */
+    /* -------------------------------------------------------------
+       6. TASK ADDING
+    ------------------------------------------------------------- */
     function addBlankTask() {
         const list = document.getElementById("task-list");
-        if (!list) return;
-
         const row = document.createElement("div");
         row.className = "task-row";
         row.innerHTML = `
             <input type="checkbox">
-            <select>
-                <option>A</option>
-                <option>B</option>
-                <option>C</option>
-            </select>
-            <div class="task-desc">
-                <input type="text">
-            </div>
+            <select><option>A</option><option>B</option><option>C</option></select>
+            <div class="task-desc"><input type="text"></div>
         `;
         list.appendChild(row);
     }
 
-    /* =====================================================================
-       6. DATE HEADER + MINI CALENDARS
-       ===================================================================== */
+    /* -------------------------------------------------------------
+       7. CALENDAR RENDERING
+    ------------------------------------------------------------- */
     function updateHeader(dateStr) {
-        if (!dateStr) return;
         const d = new Date(dateStr + "T00:00:00");
 
-        const dayNumberEl = document.getElementById("day-number");
-        const weekdayEl = document.getElementById("weekday");
-        const monthYearEl = document.getElementById("month-year");
+        document.getElementById("day-number").textContent = d.getDate();
 
-        if (dayNumberEl) dayNumberEl.textContent = d.getDate();
+        const weekdays = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+        document.getElementById("weekday").textContent = weekdays[d.getDay()];
 
-        if (weekdayEl) {
-            const names = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-            weekdayEl.textContent = names[d.getDay()];
-        }
-
-        if (monthYearEl) {
-            monthYearEl.textContent = d.toLocaleString("default", {
-                month: "long",
-                year: "numeric"
-            });
-        }
+        document.getElementById("month-year").textContent =
+            d.toLocaleString("default",{ month:"long", year:"numeric" });
 
         renderAllCalendars(d);
     }
 
     function renderMiniCalendar(containerId, year, month) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
+        const c = document.getElementById(containerId);
+        if (!c) return;
 
-        container.innerHTML = "";
-
-        const shownDate = new Date(year, month, 1);
-        const shownYear = shownDate.getFullYear();
-        const shownMonth = shownDate.getMonth();
-
+        c.innerHTML = "";
+        const date = new Date(year,month,1);
         const title = document.createElement("div");
         title.className = "mini-cal-title";
-        title.textContent = shownDate.toLocaleString("default", {
-            month: "short",
-            year: "numeric"
-        });
+        title.textContent = date.toLocaleString("default",{month:"short",year:"numeric"});
 
         const grid = document.createElement("div");
         grid.className = "mini-cal-grid";
 
-        const weekdays = ["S","M","T","W","T","F","S"];
-        weekdays.forEach(d => {
-            const cell = document.createElement("div");
-            cell.className = "weekday-label";
-            cell.textContent = d;
-            grid.appendChild(cell);
+        ["S","M","T","W","T","F","S"].forEach(d=>{
+            const lbl=document.createElement("div");
+            lbl.className="weekday-label";
+            lbl.textContent=d;
+            grid.appendChild(lbl);
         });
 
-        const first = new Date(shownYear, shownMonth, 1);
-        const last = new Date(shownYear, shownMonth + 1, 0);
+        const first = new Date(date.getFullYear(), date.getMonth(), 1);
+        const last  = new Date(date.getFullYear(), date.getMonth()+1, 0);
 
-        // leading blanks
-        for (let i = 0; i < first.getDay(); i++) {
-            grid.appendChild(document.createElement("div"));
+        for (let i=0;i<first.getDay();i++) grid.appendChild(document.createElement("div"));
+
+        for (let i=1;i<=last.getDate();i++){
+            const dayCell=document.createElement("div");
+            dayCell.textContent=i;
+            grid.appendChild(dayCell);
         }
 
-        // days
-        for (let day = 1; day <= last.getDate(); day++) {
-            const div = document.createElement("div");
-            div.textContent = day;
-            grid.appendChild(div);
-        }
-
-        container.appendChild(title);
-        container.appendChild(grid);
+        c.appendChild(title);
+        c.appendChild(grid);
     }
 
     function renderAllCalendars(d) {
         const y = d.getFullYear();
         const m = d.getMonth();
-
-        renderMiniCalendar("mini-current", y, m);
-        renderMiniCalendar("mini-prev", y, m - 1);
-        renderMiniCalendar("mini-next", y, m + 1);
+        renderMiniCalendar("mini-current",y,m);
+        renderMiniCalendar("mini-prev",y,m-1);
+        renderMiniCalendar("mini-next",y,m+1);
     }
 
-    /* =====================================================================
-       7. LAYOUT TOGGLES
-       ===================================================================== */
-    function setupLayoutToggle() {
-        const toggleBtn = document.getElementById("toggleLayout");
-        const spread = document.getElementById("spread");
-        if (!toggleBtn || !spread) return;
-
-        if (toggleBtn._plannerHooked) return;
-        toggleBtn._plannerHooked = true;
-
-        toggleBtn.addEventListener("click", () => {
-            const stacked = spread.classList.toggle("stacked");
-            toggleBtn.textContent = stacked
-                ? "Switch to Side-by-Side View"
-                : "Switch to Stacked View";
-        });
-    }
-
-    function setupPhoneViewToggle() {
-        const phoneBtn = document.getElementById("phoneViewBtn");
-        const spread = document.getElementById("spread");
-        if (!phoneBtn) return;
-
-        if (phoneBtn._plannerHooked) return;
-        phoneBtn._plannerHooked = true;
-
-        phoneBtn.addEventListener("click", () => {
-            const body = document.body;
-            const isPhone = body.classList.toggle("phone-view");
-
-            phoneBtn.textContent = isPhone ? "Exit Phone View" : "Phone View";
-
-            // When entering phone view, force stacked spread
-            if (spread && isPhone) {
-                spread.classList.add("stacked");
-            }
-        });
-    }
-
-    // Auto-enable phone view on mobile / small screens
-    function autoEnablePhoneViewIfMobile() {
-        const isSmallScreen = window.innerWidth <= 800;
-        const ua = navigator.userAgent || "";
-        const isMobileUA = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
-
-        if (isSmallScreen || isMobileUA) {
-            const body = document.body;
-            const spread = document.getElementById("spread");
-            const phoneBtn = document.getElementById("phoneViewBtn");
-
-            body.classList.add("phone-view");
-            if (spread) {
-                spread.classList.add("stacked");
-            }
-            if (phoneBtn) {
-                phoneBtn.textContent = "Exit Phone View";
-            }
+    /* -------------------------------------------------------------
+       8. PHONE VIEW MODE (auto detect)
+    ------------------------------------------------------------- */
+    function autoDetectPhone() {
+        if (window.innerWidth < 720) {
+            document.body.classList.add("phone-view");
+            const spread=document.getElementById("spread");
+            spread.classList.add("stacked");
         }
     }
 
-    /* =====================================================================
-       8. EVENT WIRING & INIT
-       ===================================================================== */
-    function attachAutoSaveListeners() {
-        if (document.body._plannerBound) return;
-        document.body._plannerBound = true;
+    function setupPhoneButton() {
+        const btn = document.getElementById("phoneViewBtn");
+        btn.addEventListener("click", () => {
+            const now = document.body.classList.toggle("phone-view");
+            btn.textContent = now ? "Exit Phone View" : "Phone View";
+            if (now) document.getElementById("spread").classList.add("stacked");
+        });
+    }
+
+    /* -------------------------------------------------------------
+       9. INIT PLANNER
+    ------------------------------------------------------------- */
+    function initPlanner() {
+        autoDetectPhone();
+        setupPhoneButton();
+
+        const dateInput = document.getElementById("date-input");
+        const today = new Date().toISOString().slice(0,10);
+        if (!dateInput.value) dateInput.value = today;
+
+        dateInput.addEventListener("change", e => {
+            updateHeader(e.target.value);
+            loadEntry(e.target.value);
+        });
+
+        updateHeader(dateInput.value);
+        loadEntry(dateInput.value);
 
         document.body.addEventListener("input", saveEntryDebounced);
         document.body.addEventListener("change", saveEntryDebounced);
+        document.getElementById("add-task").addEventListener("click",()=>{addBlankTask();saveEntryDebounced();});
     }
 
-    function onDateChange(e) {
-        const date = e.target.value;
-        if (!date) return;
-        updateHeader(date);
-        loadEntry(date);
-    }
+    /* -------------------------------------------------------------
+       10. INITIALIZE APP
+    ------------------------------------------------------------- */
+    document.addEventListener("DOMContentLoaded", () => {
+        document.getElementById("login-form").addEventListener("submit", handleLogin);
+        document.getElementById("logoutBtn").addEventListener("click", handleLogout);
+        checkLogin();
+    });
 
-    function initPlanner() {
-        const dateInput = document.getElementById("date-input");
-        const addTaskBtn = document.getElementById("add-task");
-
-        const today = new Date().toISOString().slice(0, 10);
-        let activeDate = today;
-        if (dateInput) {
-            if (!dateInput.value) {
-                dateInput.value = today;
-            }
-            activeDate = dateInput.value;
-        }
-
-        updateHeader(activeDate);
-        attachAutoSaveListeners();
-        setupLayoutToggle();
-        setupPhoneViewToggle();
-        autoEnablePhoneViewIfMobile();
-
-        // Date change handler
-        if (dateInput && !dateInput._plannerHooked) {
-            dateInput.addEventListener("change", onDateChange);
-            dateInput._plannerHooked = true;
-        }
-
-        // Add-task button
-        if (addTaskBtn && !addTaskBtn._plannerHooked) {
-            addTaskBtn.addEventListener("click", () => {
-                addBlankTask();
-                saveEntryDebounced();
-            });
-            addTaskBtn._plannerHooked = true;
-        }
-
-        // Ensure blank rows exist before loading
-        const list = document.getElementById("task-list");
-        if (list && list.children.length === 0) {
-            for (let i = 0; i < 6; i++) addBlankTask();
-        }
-
-        // Finally load data for the active date
-        loadEntry(activeDate);
-    }
-
-    document.addEventListener("DOMContentLoaded", initPlanner);
-
-    /* =====================================================================
-       9. Expose for debugging in console
-       ===================================================================== */
-    window.collectPlannerState = collectPlannerState;
-    window.saveEntryDebounced = saveEntryDebounced;
-    window.saveEntry = saveEntry;
-    window.loadEntry = loadEntry;
-    window.addBlankTask = addBlankTask;
-    window.updateHeader = updateHeader;
-    window.renderAllCalendars = renderAllCalendars;
 })();
