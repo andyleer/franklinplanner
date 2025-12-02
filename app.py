@@ -1,39 +1,181 @@
-# app.py - FULL WORKING VERSION WITH USERS + LOGIN
-# -------------------------------------------------------------
-
-from flask import Flask, request, jsonify, session, send_from_directory
-from flask_sqlalchemy import SQLAlchemy
-from flask_cors import CORS
-from werkzeug.security import generate_password_hash, check_password_hash
 import os
+from flask import Flask, request, jsonify, send_from_directory
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+from flask_cors import CORS
 
-app = Flask(__name__, static_folder=".", static_url_path="")
+app = Flask(__name__)
+CORS(app)
 
-# --------------------------------------------------------------------
-# CONFIG
-# --------------------------------------------------------------------
-app.secret_key = os.environ.get("SECRET_KEY", "dev_secret_key")
-
-# Render provides DATABASE_URL; local dev uses SQLite
-db_url = os.environ.get("DATABASE_URL", "sqlite:///local.db")
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://")
-
-app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+# -------------------------
+# DATABASE CONFIG
+# -------------------------
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
-CORS(app, supports_credentials=True)
 
-
-# --------------------------------------------------------------------
-# DATABASE MODELS
-# --------------------------------------------------------------------
+# -------------------------
+# MODELS
+# -------------------------
 
 class User(db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(255), unique=True)
+    email = db.Column(db.String, unique=True, nullable=False)
+
+class Day(db.Model):
+    __tablename__ = "days"
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.String, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    notes = db.Column(db.Text, default="")
+    tracker = db.Column(db.Text, default="")
+
+class Task(db.Model):
+    __tablename__ = "tasks"
+    id = db.Column(db.Integer, primary_key=True)
+    day_id = db.Column(db.Integer, db.ForeignKey("days.id"), nullable=False)
+    priority = db.Column(db.String, default="C")
+    description = db.Column(db.Text, default="")
+    checked = db.Column(db.Boolean, default=False)
+
+class Appointment(db.Model):
+    __tablename__ = "appointments"
+    id = db.Column(db.Integer, primary_key=True)
+    day_id = db.Column(db.Integer, db.ForeignKey("days.id"), nullable=False)
+    time = db.Column(db.String, nullable=False)
+    text = db.Column(db.Text, default="")
+
+# -------------------------
+# HELPERS
+# -------------------------
+
+def get_or_create_user():
+    """Gets user from header or creates one."""
+    email = request.headers.get("X-User-Email")
+
+    if not email:
+        return None, ("Missing X-User-Email header", 400)
+
+    existing = User.query.filter_by(email=email).first()
+    if existing:
+        return existing, None
+
+    new_user = User(email=email)
+    db.session.add(new_user)
+    db.session.commit()
+    return new_user, None
+
+def get_or_create_day(user, date_str):
+    """Gets or creates a day entry for a user"""
+    day = Day.query.filter_by(user_id=user.id, date=date_str).first()
+    if day:
+        return day
+
+    day = Day(date=date_str, user_id=user.id)
+    db.session.add(day)
+    db.session.commit()
+    return day
+
+# -------------------------
+# API ROUTES
+# -------------------------
+
+@app.route("/api/day/<date_str>", methods=["GET"])
+def api_get_day(date_str):
+    user, err = get_or_create_user()
+    if err:
+        return err
+
+    day = Day.query.filter_by(user_id=user.id, date=date_str).first()
+
+    if not day:
+        return jsonify({
+            "tasks": [],
+            "appointments": [],
+            "notes": "",
+            "tracker": ""
+        })
+
+    tasks = Task.query.filter_by(day_id=day.id).all()
+    appointments = Appointment.query.filter_by(day_id=day.id).all()
+
+    return jsonify({
+        "tasks": [{
+            "checked": t.checked,
+            "priority": t.priority,
+            "description": t.description
+        } for t in tasks],
+        "appointments": [{
+            "time": a.time,
+            "text": a.text
+        } for a in appointments],
+        "notes": day.notes,
+        "tracker": day.tracker
+    })
+
+@app.route("/api/day/<date_str>", methods=["POST"])
+def api_save_day(date_str):
+    user, err = get_or_create_user()
+    if err:
+        return err
+
+    payload = request.get_json()
+    day = get_or_create_day(user, date_str)
+
+    # Save notes & tracker
+    day.notes = payload.get("notes", "")
+    day.tracker = payload.get("tracker", "")
+
+    # Replace tasks
+    Task.query.filter_by(day_id=day.id).delete()
+    for t in payload.get("tasks", []):
+        task = Task(
+            day_id=day.id,
+            priority=t.get("priority", "C"),
+            description=t.get("description", ""),
+            checked=t.get("checked", False)
+        )
+        db.session.add(task)
+
+    # Replace appointments
+    Appointment.query.filter_by(day_id=day.id).delete()
+    for a in payload.get("appointments", []):
+        appt = Appointment(
+            day_id=day.id,
+            time=a.get("time", ""),
+            text=a.get("text", "")
+        )
+        db.session.add(appt)
+
+    db.session.commit()
+
+    return jsonify({"status": "saved"})
+
+# -------------------------
+# STATIC FILE SERVE
+# -------------------------
+
+@app.route("/")
+def index():
+    return send_from_directory(".", "index.html")
+
+@app.route("/<path:path>")
+def static_proxy(path):
+    return send_from_directory(".", path)
+
+@app.route("/health")
+def health():
+    return "OK", 200
+
+# -------------------------
+# MAIN
+# -------------------------
+if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
+    app.run(host="0.0.0.0", port=8000)
     password_hash = db.Column(db.String(255))
 
 
