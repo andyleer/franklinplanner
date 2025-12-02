@@ -1,182 +1,220 @@
-/* -------------------------------------------------------
-   Franklin Planner – Frontend Logic
-------------------------------------------------------- */
+//-----------------------------------------------------------
+// GLOBALS
+//-----------------------------------------------------------
+let CURRENT_DATE = new Date().toISOString().split("T")[0];
 
-let currentDate = null;
-
-/* --------------------------
-   LOGIN / SIGNUP HANDLERS
---------------------------- */
-
-document.getElementById("login-btn").onclick = async () => {
-    const email = document.getElementById("login-email").value.trim();
-    const pw = document.getElementById("login-password").value;
-
-    const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, password: pw })
-    });
-
-    const data = await res.json();
-    if (data.error) {
-        alert(data.error);
-        return;
-    }
-
-    showPlanner();
-};
-
-document.getElementById("signup-btn").onclick = async () => {
-    const email = document.getElementById("signup-email").value.trim();
-    const pw = document.getElementById("signup-password").value;
-
-    const res = await fetch("/api/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, password: pw })
-    });
-
-    const data = await res.json();
-    if (data.error) {
-        alert(data.error);
-        return;
-    }
-
-    showPlanner();
-};
-
-function showPlanner() {
-    document.getElementById("auth-screen").style.display = "none";
-    document.getElementById("planner-screen").style.display = "block";
-
-    const today = new Date().toISOString().slice(0, 10);
-    loadDay(today);
+// Utility
+function $(sel) {
+    return document.querySelector(sel);
+}
+function $all(sel) {
+    return Array.from(document.querySelectorAll(sel));
 }
 
-/* --------------------------
-   LOAD A DAY
---------------------------- */
-async function loadDay(date) {
-    currentDate = date;
+//-----------------------------------------------------------
+// AUTH
+//-----------------------------------------------------------
+async function apiSignup(email, password) {
+    const r = await fetch("/api/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password })
+    });
+    return r.json();
+}
 
-    const res = await fetch(`/api/day/${date}`, {
-        method: "GET",
+async function apiLogin(email, password) {
+    const r = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password })
+    });
+    return r.json();
+}
+
+async function apiLogout() {
+    await fetch("/api/logout", {
+        method: "POST",
         credentials: "include"
     });
+}
 
-    const data = await res.json();
-    if (data.error) {
-        alert("Session expired, please log in again.");
-        location.reload();
+//-----------------------------------------------------------
+// LOAD + SAVE DAY
+//-----------------------------------------------------------
+async function loadDay(date) {
+    const r = await fetch(`/api/day/${date}`, {
+        credentials: "include"
+    });
+    const data = await r.json();
+
+    if (data.error === "unauthorized") {
+        showLogin();
         return;
     }
 
-    document.getElementById("notes").value = data.notes || "";
-    document.getElementById("tracker").value = data.tracker || "";
+    CURRENT_DATE = date;
+
+    // Notes + tracker
+    $("#notes").value = data.notes || "";
+    $("#tracker").value = data.tracker || "";
 
     // Tasks
-    const taskList = document.getElementById("task-list");
-    taskList.innerHTML = "";
-    (data.tasks || []).forEach(t => addTask(t.priority, t.description, t.checked));
+    $("#task-list").innerHTML = "";
+    (data.tasks || []).forEach(t => addTaskRow(t.priority, t.description, t.checked));
 
     // Appointments
-    const apptList = document.getElementById("appointment-list");
-    apptList.innerHTML = "";
-    (data.appointments || []).forEach(a => addAppointment(a.time, a.text));
+    $("#appt-list").innerHTML = "";
+    (data.appointments || []).forEach(a => addApptRow(a.time, a.text));
 }
 
-/* --------------------------
-   SAVE A DAY
---------------------------- */
-document.getElementById("save-btn").onclick = async () => {
+async function saveDay() {
     const payload = {
-        notes: document.getElementById("notes").value,
-        tracker: document.getElementById("tracker").value,
-        tasks: gatherTasks(),
-        appointments: gatherAppointments()
+        notes: $("#notes").value,
+        tracker: $("#tracker").value,
+        tasks: $all(".task-row").map(row => ({
+            priority: row.querySelector(".t-priority").value,
+            description: row.querySelector(".t-text").value,
+            checked: row.querySelector(".t-check").checked
+        })),
+        appointments: $all(".appt-row").map(row => ({
+            time: row.querySelector(".a-time").value,
+            text: row.querySelector(".a-text").value
+        }))
     };
 
-    const res = await fetch(`/api/day/${currentDate}`, {
+    await fetch(`/api/day/${CURRENT_DATE}`, {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(payload)
     });
-
-    const data = await res.json();
-    if (data.status !== "ok") alert("Save failed");
-};
-
-function gatherTasks() {
-    return [...document.querySelectorAll(".task-row")].map(row => ({
-        priority: row.querySelector(".task-priority").value,
-        description: row.querySelector(".task-desc").value,
-        checked: row.querySelector(".task-check").checked
-    }));
 }
 
-function gatherAppointments() {
-    return [...document.querySelectorAll(".appt-row")].map(row => ({
-        time: row.querySelector(".appt-time").value,
-        text: row.querySelector(".appt-text").value
-    }));
+//-----------------------------------------------------------
+// UI HELPERS
+//-----------------------------------------------------------
+function showLogin() {
+    $("#login-container").style.display = "block";
+    $("#planner-container").style.display = "none";
 }
 
-/* --------------------------
-   TASK UI HELPERS
---------------------------- */
-function addTask(priority = "A", description = "", checked = false) {
-    const el = document.createElement("div");
-    el.className = "task-row";
-    el.innerHTML = `
-        <input type="checkbox" class="task-check" ${checked ? "checked" : ""}>
-        <select class="task-priority">
-            <option value="A" ${priority === "A" ? "selected" : ""}>A</option>
-            <option value="B" ${priority === "B" ? "selected" : ""}>B</option>
-            <option value="C" ${priority === "C" ? "selected" : ""}>C</option>
+function showPlanner() {
+    $("#login-container").style.display = "none";
+    $("#planner-container").style.display = "block";
+    loadDay(CURRENT_DATE);
+}
+
+//-----------------------------------------------------------
+// TASK + APPT ROWS
+//-----------------------------------------------------------
+function addTaskRow(priority = "A", text = "", checked = false) {
+    const row = document.createElement("div");
+    row.className = "task-row";
+    row.innerHTML = `
+        <input type="checkbox" class="t-check" ${checked ? "checked" : ""}>
+        <select class="t-priority">
+            <option ${priority === "A" ? "selected" : ""}>A</option>
+            <option ${priority === "B" ? "selected" : ""}>B</option>
+            <option ${priority === "C" ? "selected" : ""}>C</option>
         </select>
-        <input class="task-desc" value="${description}">
-        <button class="delete-task">X</button>
+        <input class="t-text" value="${text}">
+        <button class="task-del">X</button>
     `;
-
-    el.querySelector(".delete-task").onclick = () => el.remove();
-    document.getElementById("task-list").appendChild(el);
+    row.querySelector(".task-del").onclick = () => row.remove();
+    $("#task-list").appendChild(row);
 }
 
-document.getElementById("add-task-btn").onclick = () => addTask();
-
-/* --------------------------
-   APPOINTMENT UI HELPERS
---------------------------- */
-function addAppointment(time = "", text = "") {
-    const el = document.createElement("div");
-    el.className = "appt-row";
-    el.innerHTML = `
-        <input class="appt-time" type="time" value="${time}">
-        <input class="appt-text" value="${text}">
-        <button class="delete-appt">X</button>
+function addApptRow(time = "", text = "") {
+    const row = document.createElement("div");
+    row.className = "appt-row";
+    row.innerHTML = `
+        <input class="a-time" value="${time}" placeholder="9:00 AM">
+        <input class="a-text" value="${text}" placeholder="Appointment">
+        <button class="appt-del">X</button>
     `;
-
-    el.querySelector(".delete-appt").onclick = () => el.remove();
-    document.getElementById("appointment-list").appendChild(el);
+    row.querySelector(".appt-del").onclick = () => row.remove();
+    $("#appt-list").appendChild(row);
 }
 
-document.getElementById("add-appt-btn").onclick = () => addAppointment();
+//-----------------------------------------------------------
+// EVENT LISTENERS
+//-----------------------------------------------------------
 
-/* --------------------------
-   DATE NAVIGATION
---------------------------- */
-document.getElementById("prev-day").onclick = () => {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() - 1);
-    loadDay(d.toISOString().slice(0, 10));
-};
+// LOGIN
+$("#login-btn")?.addEventListener("click", async () => {
+    const email = $("#login-email").value.trim();
+    const pw = $("#login-password").value.trim();
 
-document.getElementById("next-day").onclick = () => {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() + 1);
-    loadDay(d.toISOString().slice(0, 10));
-};
+    const result = await apiLogin(email, pw);
+
+    if (result.error) {
+        alert("Invalid login.");
+        return;
+    }
+
+    showPlanner();
+});
+
+// SIGNUP
+$("#signup-btn")?.addEventListener("click", async () => {
+    const email = $("#login-email").value.trim();
+    const pw = $("#login-password").value.trim();
+
+    const result = await apiSignup(email, pw);
+
+    if (result.error) {
+        alert(result.error);
+        return;
+    }
+
+    showPlanner();
+});
+
+// Logout
+$("#logout-btn")?.addEventListener("click", async () => {
+    await apiLogout();
+    showLogin();
+});
+
+// Navigation arrows
+$("#prev-day")?.addEventListener("click", () => {
+    const dt = new Date(CURRENT_DATE);
+    dt.setDate(dt.getDate() - 1);
+    loadDay(dt.toISOString().split("T")[0]);
+});
+$("#next-day")?.addEventListener("click", () => {
+    const dt = new Date(CURRENT_DATE);
+    dt.setDate(dt.getDate() + 1);
+    loadDay(dt.toISOString().split("T")[0]);
+});
+
+// Add rows
+$("#add-task")?.addEventListener("click", () => addTaskRow());
+$("#add-appt")?.addEventListener("click", () => addApptRow());
+
+// Auto-save (basic)
+$all("textarea, input").forEach(el => {
+    el.addEventListener("change", saveDay);
+    el.addEventListener("keyup", () => {
+        clearTimeout(window._saveTimer);
+        window._saveTimer = setTimeout(saveDay, 500);
+    });
+});
+
+//-----------------------------------------------------------
+// INITIAL CHECK
+//-----------------------------------------------------------
+
+(async function init() {
+    const r = await fetch("/api/day/" + CURRENT_DATE, { credentials: "include" });
+    const data = await r.json();
+
+    if (data.error === "unauthorized") {
+        showLogin();
+    } else {
+        showPlanner();
+    }
+})();
