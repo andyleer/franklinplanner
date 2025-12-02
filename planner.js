@@ -1,244 +1,408 @@
-// -----------------------------------------------------------
-// GLOBAL STATE
-// -----------------------------------------------------------
-let currentDate = null;
-let isSaving = false;
+// planner.js
+// Frontend for Franklin Planner backend in app.py
+// Uses cookie-based session auth and per-user/per-day data.
 
-// -----------------------------------------------------------
-// DATE HELPERS
-// -----------------------------------------------------------
-function formatDateForAPI(dateObj) {
-    const y = dateObj.getFullYear();
-    const m = String(dateObj.getMonth() + 1).padStart(2, "0");
-    const d = String(dateObj.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+const API_BASE = ""; // same origin
+
+let currentDate = new Date(); // JS Date object
+
+// ---------- DOM HELPERS ----------
+function $(id) {
+  return document.getElementById(id);
 }
 
-// -----------------------------------------------------------
-// AUTH UI
-// -----------------------------------------------------------
-async function signup() {
-    const email = document.getElementById("signup-email").value.trim();
-    const pw = document.getElementById("signup-password").value;
+// Sections
+const authSection = $("auth-section");
+const plannerSection = $("planner-section");
 
-    const res = await fetch("/api/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: pw }),
-        credentials: "include"
-    });
+// Auth elements
+const loginForm = $("login-form");
+const signupForm = $("signup-form");
+const loginEmailInput = $("login-email");
+const loginPasswordInput = $("login-password");
+const signupEmailInput = $("signup-email");
+const signupPasswordInput = $("signup-password");
+const logoutBtn = $("logout-btn");
 
-    const data = await res.json();
-    if (data.error) {
-        alert(data.error);
-        return;
+// Date navigation
+const dateDisplay = $("date-display");
+const prevDayBtn = $("prev-day");
+const nextDayBtn = $("next-day");
+
+// Planner elements
+const tasksBody = $("tasks-body");
+const addTaskBtn = $("add-task");
+const apptBody = $("appointments-body");
+const addApptBtn = $("add-appointment");
+const notesInput = $("notes");
+const trackerInput = $("tracker");
+const saveDayBtn = $("save-day");
+
+// ---------- DATE HELPERS ----------
+function pad2(n) {
+  return n < 10 ? "0" + n : "" + n;
+}
+
+function dateToString(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function stringToDate(s) {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function formatPrettyDate(d) {
+  return d.toLocaleDateString(undefined, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+// ---------- UI TOGGLING ----------
+function showAuth() {
+  if (authSection) authSection.style.display = "block";
+  if (plannerSection) plannerSection.style.display = "none";
+}
+
+function showPlanner() {
+  if (authSection) authSection.style.display = "none";
+  if (plannerSection) plannerSection.style.display = "block";
+}
+
+// ---------- ROW BUILDERS ----------
+function createTaskRow(task = {}) {
+  const tr = document.createElement("tr");
+
+  // Priority (A/B/C)
+  const tdPriority = document.createElement("td");
+  const sel = document.createElement("select");
+  sel.className = "task-priority";
+  ["A", "B", "C"].forEach((p) => {
+    const opt = document.createElement("option");
+    opt.value = p;
+    opt.textContent = p;
+    if (task.priority === p) opt.selected = true;
+  });
+  tdPriority.appendChild(sel);
+
+  // Description
+  const tdDesc = document.createElement("td");
+  const descInput = document.createElement("input");
+  descInput.type = "text";
+  descInput.className = "task-desc";
+  descInput.value = task.description || "";
+  tdDesc.appendChild(descInput);
+
+  // Checked
+  const tdChecked = document.createElement("td");
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.className = "task-checked";
+  cb.checked = !!task.checked;
+  tdChecked.appendChild(cb);
+
+  tr.appendChild(tdPriority);
+  tr.appendChild(tdDesc);
+  tr.appendChild(tdChecked);
+
+  return tr;
+}
+
+function createApptRow(appt = {}) {
+  const tr = document.createElement("tr");
+
+  const tdTime = document.createElement("td");
+  const timeInput = document.createElement("input");
+  timeInput.className = "appt-time";
+  // You can change type to "time" if your HTML supports it
+  timeInput.type = "time";
+  timeInput.value = appt.time || "";
+  tdTime.appendChild(timeInput);
+
+  const tdText = document.createElement("td");
+  const textInput = document.createElement("input");
+  textInput.type = "text";
+  textInput.className = "appt-text";
+  textInput.value = appt.text || "";
+  tdText.appendChild(textInput);
+
+  tr.appendChild(tdTime);
+  tr.appendChild(tdText);
+  return tr;
+}
+
+// ---------- RENDER DAY ----------
+function renderDay(data) {
+  const dateStr = data.date;
+  currentDate = stringToDate(dateStr);
+
+  if (dateDisplay) {
+    dateDisplay.textContent = formatPrettyDate(currentDate);
+  }
+
+  if (notesInput) notesInput.value = data.notes || "";
+  if (trackerInput) trackerInput.value = data.tracker || "";
+
+  // Tasks
+  if (tasksBody) {
+    tasksBody.innerHTML = "";
+    const tasks = data.tasks || [];
+    if (tasks.length === 0) {
+      // Start with a few blank rows for convenience
+      for (let i = 0; i < 6; i++) {
+        tasksBody.appendChild(createTaskRow());
+      }
+    } else {
+      tasks.forEach((t) => tasksBody.appendChild(createTaskRow(t)));
     }
+  }
 
-    document.getElementById("auth-section").style.display = "none";
-    document.getElementById("planner-section").style.display = "block";
-    loadToday();
-}
-
-async function login() {
-    const email = document.getElementById("login-email").value.trim();
-    const pw = document.getElementById("login-password").value;
-
-    const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: pw }),
-        credentials: "include"
-    });
-
-    const data = await res.json();
-    if (data.error) {
-        alert(data.error);
-        return;
+  // Appointments
+  if (apptBody) {
+    apptBody.innerHTML = "";
+    const appts = data.appointments || [];
+    if (appts.length === 0) {
+      // Start with some blank rows
+      for (let i = 0; i < 8; i++) {
+        apptBody.appendChild(createApptRow());
+      }
+    } else {
+      appts.forEach((a) => apptBody.appendChild(createApptRow(a)));
     }
-
-    document.getElementById("auth-section").style.display = "none";
-    document.getElementById("planner-section").style.display = "block";
-    loadToday();
+  }
 }
 
-async function logout() {
-    await fetch("/api/logout", { method: "POST", credentials: "include" });
-    location.reload();
+// ---------- COLLECT DATA FROM UI ----------
+function collectTasksFromUI() {
+  if (!tasksBody) return [];
+  const rows = Array.from(tasksBody.querySelectorAll("tr"));
+  const tasks = [];
+
+  rows.forEach((row) => {
+    const pr = row.querySelector(".task-priority");
+    const desc = row.querySelector(".task-desc");
+    const chk = row.querySelector(".task-checked");
+
+    const description = desc ? desc.value.trim() : "";
+    const priority = pr ? pr.value || "A" : "A";
+    const checked = chk ? chk.checked : false;
+
+    // If row is totally blank, skip it
+    if (!description && !checked) return;
+
+    tasks.push({ priority, description, checked });
+  });
+
+  return tasks;
 }
 
-// -----------------------------------------------------------
-// LOAD DAY
-// -----------------------------------------------------------
-async function loadDay(dateObj) {
-    currentDate = dateObj;
+function collectAppointmentsFromUI() {
+  if (!apptBody) return [];
+  const rows = Array.from(apptBody.querySelectorAll("tr"));
+  const appts = [];
 
-    const dateStr = formatDateForAPI(dateObj);
+  rows.forEach((row) => {
+    const timeInput = row.querySelector(".appt-time");
+    const textInput = row.querySelector(".appt-text");
 
-    const res = await fetch(`/api/day/${dateStr}`, {
-        method: "GET",
-        credentials: "include"
-    });
+    const time = timeInput ? timeInput.value.trim() : "";
+    const text = textInput ? textInput.value.trim() : "";
 
-    if (res.status === 401) {
-        alert("Session expired. Please log in again.");
-        location.reload();
-        return;
-    }
+    // Skip empty rows
+    if (!time && !text) return;
 
-    const data = await res.json();
+    appts.push({ time, text });
+  });
+
+  return appts;
+}
+
+// ---------- API CALLS ----------
+async function apiGetDay(dateStr) {
+  const resp = await fetch(`${API_BASE}/api/day/${dateStr}`, {
+    credentials: "include",
+  });
+
+  if (resp.status === 401) {
+    showAuth();
+    throw new Error("unauthorized");
+  }
+
+  if (!resp.ok) {
+    throw new Error("Failed to load day");
+  }
+
+  const data = await resp.json();
+  return data;
+}
+
+async function apiSaveDay(dateStr) {
+  const payload = {
+    date: dateStr,
+    notes: notesInput ? notesInput.value : "",
+    tracker: trackerInput ? trackerInput.value : "",
+    tasks: collectTasksFromUI(),
+    appointments: collectAppointmentsFromUI(),
+  };
+
+  const resp = await fetch(`${API_BASE}/api/day/${dateStr}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  if (resp.status === 401) {
+    showAuth();
+    throw new Error("unauthorized");
+  }
+
+  if (!resp.ok) {
+    throw new Error("Failed to save day");
+  }
+
+  return resp.json();
+}
+
+// ---------- AUTH HANDLERS ----------
+async function handleLogin(e) {
+  e.preventDefault();
+  if (!loginEmailInput || !loginPasswordInput) return;
+
+  const email = loginEmailInput.value.trim();
+  const password = loginPasswordInput.value;
+
+  if (!email || !password) {
+    alert("Email and password required");
+    return;
+  }
+
+  const resp = await fetch(`${API_BASE}/api/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    alert(err.error || "Login failed");
+    return;
+  }
+
+  showPlanner();
+  // Load today's day after login
+  loadCurrentDate();
+}
+
+async function handleSignup(e) {
+  e.preventDefault();
+  if (!signupEmailInput || !signupPasswordInput) return;
+
+  const email = signupEmailInput.value.trim();
+  const password = signupPasswordInput.value;
+
+  if (!email || !password) {
+    alert("Email and password required");
+    return;
+  }
+
+  const resp = await fetch(`${API_BASE}/api/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    alert(err.error || "Signup failed");
+    return;
+  }
+
+  showPlanner();
+  loadCurrentDate();
+}
+
+async function handleLogout() {
+  await fetch(`${API_BASE}/api/logout`, {
+    method: "POST",
+    credentials: "include",
+  }).catch(() => {});
+  showAuth();
+}
+
+// ---------- DAY NAVIGATION ----------
+async function loadCurrentDate() {
+  const dateStr = dateToString(currentDate);
+  try {
+    const data = await apiGetDay(dateStr);
     renderDay(data);
+  } catch (err) {
+    console.error(err);
+  }
 }
 
-function loadToday() {
-    loadDay(new Date());
+function goToPreviousDay() {
+  currentDate.setDate(currentDate.getDate() - 1);
+  loadCurrentDate();
 }
 
-// -----------------------------------------------------------
-// RENDER DAY INTO UI
-// -----------------------------------------------------------
-function renderDay(dayObj) {
-    const tasks = dayObj.tasks || [];
-    const appts = dayObj.appointments || [];
-
-    // Tasks
-    const taskContainer = document.getElementById("task-list");
-    taskContainer.innerHTML = "";
-
-    tasks.forEach(t => {
-        const row = document.createElement("div");
-        row.className = "task-row";
-
-        row.innerHTML = `
-            <input type="checkbox" class="task-check" ${t.checked ? "checked" : ""}>
-            <select class="task-priority">
-                <option value="A" ${t.priority === "A" ? "selected" : ""}>A</option>
-                <option value="B" ${t.priority === "B" ? "selected" : ""}>B</option>
-                <option value="C" ${t.priority === "C" ? "selected" : ""}>C</option>
-            </select>
-            <input type="text" class="task-desc" value="${t.description}">
-        `;
-
-        taskContainer.appendChild(row);
-    });
-
-    // Notes + Tracker
-    document.getElementById("notes").value = dayObj.notes || "";
-    document.getElementById("tracker").value = dayObj.tracker || "";
-
-    // Appointments
-    const apptContainer = document.getElementById("appointment-list");
-    apptContainer.innerHTML = "";
-
-    appts.forEach(a => {
-        const row = document.createElement("div");
-        row.className = "appt-row";
-        row.innerHTML = `
-            <input class="appt-time" value="${a.time}">
-            <input class="appt-text" value="${a.text}">
-        `;
-        apptContainer.appendChild(row);
-    });
+function goToNextDay() {
+  currentDate.setDate(currentDate.getDate() + 1);
+  loadCurrentDate();
 }
 
-// -----------------------------------------------------------
-// COLLECT DATA FROM UI
-// -----------------------------------------------------------
-function collectDayData() {
-    const tasks = [];
-    const taskRows = document.querySelectorAll(".task-row");
+// ---------- INIT ----------
+document.addEventListener("DOMContentLoaded", () => {
+  // Wire auth
+  if (loginForm) loginForm.addEventListener("submit", handleLogin);
+  if (signupForm) signupForm.addEventListener("submit", handleSignup);
+  if (logoutBtn) logoutBtn.addEventListener("click", handleLogout);
 
-    taskRows.forEach(r => {
-        tasks.push({
-            checked: r.querySelector(".task-check").checked,
-            priority: r.querySelector(".task-priority").value,
-            description: r.querySelector(".task-desc").value.trim()
-        });
+  // Wire planner buttons
+  if (prevDayBtn) prevDayBtn.addEventListener("click", goToPreviousDay);
+  if (nextDayBtn) nextDayBtn.addEventListener("click", goToNextDay);
+
+  if (addTaskBtn && tasksBody) {
+    addTaskBtn.addEventListener("click", () => {
+      tasksBody.appendChild(createTaskRow());
     });
+  }
 
-    const appointments = [];
-    const apptRows = document.querySelectorAll(".appt-row");
-
-    apptRows.forEach(r => {
-        appointments.push({
-            time: r.querySelector(".appt-time").value.trim(),
-            text: r.querySelector(".appt-text").value.trim()
-        });
+  if (addApptBtn && apptBody) {
+    addApptBtn.addEventListener("click", () => {
+      apptBody.appendChild(createApptRow());
     });
+  }
 
-    return {
-        tasks,
-        appointments,
-        notes: document.getElementById("notes").value,
-        tracker: document.getElementById("tracker").value
-    };
-}
-
-// -----------------------------------------------------------
-// AUTO SAVE
-// -----------------------------------------------------------
-async function saveDay() {
-    if (!currentDate || isSaving) return;
-
-    isSaving = true;
-    const dateStr = formatDateForAPI(currentDate);
-    const payload = collectDayData();
-
-    await fetch(`/api/day/${dateStr}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload)
+  if (saveDayBtn) {
+    saveDayBtn.addEventListener("click", async () => {
+      try {
+        await apiSaveDay(dateToString(currentDate));
+        // You could show a subtle “Saved” indicator here if you want
+      } catch (err) {
+        console.error(err);
+        alert("Failed to save");
+      }
     });
+  }
 
-    isSaving = false;
-}
-
-// Auto-save on change
-document.addEventListener("input", () => {
-    saveDay();
+  // On first load, try to load today's date.
+  // If not logged in, backend returns 401 and we fall back to login UI.
+  currentDate = new Date();
+  apiGetDay(dateToString(currentDate))
+    .then((data) => {
+      showPlanner();
+      renderDay(data);
+    })
+    .catch((err) => {
+      console.log("Not logged in yet or error:", err);
+      showAuth();
+    });
 });
-
-// -----------------------------------------------------------
-// ADD ROWS
-// -----------------------------------------------------------
-function addTask() {
-    const container = document.getElementById("task-list");
-    const row = document.createElement("div");
-    row.className = "task-row";
-    row.innerHTML = `
-        <input type="checkbox" class="task-check">
-        <select class="task-priority">
-            <option value="A">A</option>
-            <option value="B">B</option>
-            <option value="C" selected>C</option>
-        </select>
-        <input type="text" class="task-desc">
-    `;
-    container.appendChild(row);
-}
-
-function addAppointment() {
-    const container = document.getElementById("appointment-list");
-    const row = document.createElement("div");
-    row.className = "appt-row";
-    row.innerHTML = `
-        <input class="appt-time" placeholder="9:00 AM">
-        <input class="appt-text" placeholder="Description">
-    `;
-    container.appendChild(row);
-}
-
-// -----------------------------------------------------------
-// NAVIGATION
-// -----------------------------------------------------------
-function goPrevDay() {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() - 1);
-    loadDay(d);
-}
-
-function goNextDay() {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() + 1);
-    loadDay(d);
-}
