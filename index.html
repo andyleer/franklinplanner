@@ -1,141 +1,219 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Franklin Planner</title>
+<meta charset="UTF-8">
+<title>Franklin Planner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="styles.css">
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: #f4f4f4;
-        }
+<style>
+    body {
+        font-family: sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #f5f5f5;
+    }
 
-        #auth-container, #planner-container {
-            max-width: 900px;
-            margin: auto;
-            padding: 20px;
-        }
+    /* ---------- LOGIN SCREEN ---------- */
+    #login-screen {
+        max-width: 400px;
+        margin: 80px auto;
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 0 8px rgba(0,0,0,0.15);
+    }
 
-        .hidden { display: none; }
+    #planner {
+        display: none;
+        padding: 20px;
+    }
 
-        input, textarea, select {
-            width: 100%;
-            padding: 6px;
-            margin: 4px 0;
-            font-size: 16px;
-        }
+    input, select, textarea {
+        width: 100%;
+        padding: 8px;
+        margin: 6px 0;
+        box-sizing: border-box;
+    }
 
-        .task-row, .appt-row {
-            display: grid;
-            grid-template-columns: 40px 60px 1fr;
-            gap: 6px;
-            margin-bottom: 5px;
-        }
+    .button-row {
+        margin-top: 15px;
+        display: flex;
+        gap: 10px;
+    }
 
-        .appt-row {
-            grid-template-columns: 80px 1fr;
-        }
+    button {
+        padding: 10px 15px;
+        border: none;
+        background: #333;
+        color: white;
+        cursor: pointer;
+        border-radius: 5px;
+    }
 
-        .section {
-            background: white;
-            padding: 15px;
-            margin-top: 18px;
-            border-radius: 6px;
-        }
+    button:hover {
+        background: #111;
+    }
 
-        .section h2 {
-            margin: 0 0 10px 0;
-            font-size: 20px;
-            border-bottom: 1px solid #ccc;
-            padding-bottom: 4px;
-        }
+    /* ---------- LAYOUT MODES ---------- */
 
-        button {
-            padding: 8px 14px;
-            margin: 10px 0;
-            font-size: 15px;
-        }
+    #controls {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
 
-        #statusMsg {
-            margin-top: 10px;
-            color: green;
-            font-weight: bold;
-            height: 20px;
-        }
-    </style>
+    /* Three view buttons */
+    .view-btn {
+        padding: 6px 12px;
+        font-size: 14px;
+        background: #ddd;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .view-btn.active {
+        background: #222;
+        color: white;
+    }
+
+    /* Full two-page spread */
+    #planner-pages {
+        display: flex;
+        gap: 25px;
+    }
+
+    /* Stacked for small screens */
+    .stacked #planner-pages {
+        flex-direction: column;
+    }
+
+    /* Phone mode (clean vertical layout) */
+    .phone #planner-pages {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    /* ---------- LEFT PAGE ---------- */
+    .page {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        flex: 1;
+        box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+        margin-top: 0;
+        margin-bottom: 10px;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 5px;
+    }
+
+    /* ---------- TASKS ---------- */
+    #task-list .task-row {
+        display: flex;
+        margin-bottom: 6px;
+        gap: 6px;
+    }
+
+    #task-list select {
+        width: 55px;
+    }
+
+    #task-list input[type='text'] {
+        flex: 1;
+    }
+
+    /* ---------- APPOINTMENTS ---------- */
+    #appointment-list .appt-row {
+        display: flex;
+        margin-bottom: 6px;
+        gap: 6px;
+    }
+
+    #appointment-list input.time {
+        width: 90px;
+    }
+
+    #appointment-list input.text {
+        flex: 1;
+    }
+
+    /* ---------- NOTES & TRACKER ---------- */
+    textarea {
+        width: 100%;
+        height: 180px;
+        resize: vertical;
+    }
+</style>
 </head>
-
 <body>
 
-<!-- --------------------------------------------------------- -->
-<!-- LOGIN / SIGNUP SCREEN -->
-<!-- --------------------------------------------------------- -->
-<div id="auth-container">
-    <h1>Franklin Planner Login</h1>
+<!-- ========================================================= -->
+<!-- LOGIN SCREEN -->
+<!-- ========================================================= -->
+<div id="login-screen">
+    <h2>Sign In</h2>
+    <input id="login-email" type="email" placeholder="Email">
+    <input id="login-password" type="password" placeholder="Password">
 
-    <div>
-        <label>Email</label>
-        <input type="email" id="authEmail">
-        <label>Password</label>
-        <input type="password" id="authPassword">
+    <div class="button-row">
+        <button id="login-button">Log In</button>
+        <button id="signup-button" style="background:#555;">Create Account</button>
     </div>
 
-    <button onclick="signup()">Create Account</button>
-    <button onclick="login()">Log In</button>
-
-    <div id="authError" style="color:red; margin-top:10px;"></div>
+    <p id="login-error" style="color:red;"></p>
 </div>
 
-<!-- --------------------------------------------------------- -->
+<!-- ========================================================= -->
 <!-- MAIN PLANNER -->
-<!-- --------------------------------------------------------- -->
-<div id="planner-container" class="hidden">
+<!-- ========================================================= -->
+<div id="planner">
 
-    <button onclick="logout()">Logout</button>
+    <!-- Top Controls (Logout, date nav, view modes) -->
+    <div id="controls">
+        <button id="logout-btn">Logout</button>
 
-    <h1 id="dayTitle"></h1>
-    <button onclick="previousDay()">← Previous</button>
-    <button onclick="nextDay()">Next →</button>
+        <button id="prev-day">◀</button>
+        <input type="date" id="current-date">
+        <button id="next-day">▶</button>
 
-    <!-- TASKS -->
-    <div class="section">
-        <h2>Tasks</h2>
-
-        <div id="tasks"></div>
-        <button onclick="addTask()">+ Add Task</button>
+        <div style="margin-left:auto; display:flex; gap:8px;">
+            <div id="btn-full" class="view-btn active">Two-Page</div>
+            <div id="btn-stacked" class="view-btn">Stacked</div>
+            <div id="btn-phone" class="view-btn">Phone</div>
+        </div>
     </div>
 
-    <!-- APPOINTMENTS -->
-    <div class="section">
-        <h2>Appointments</h2>
+    <!-- ========================================================= -->
+    <!-- TWO-PAGE LAYOUT -->
+    <!-- ========================================================= -->
+    <div id="planner-pages">
 
-        <div id="appointments"></div>
-        <button onclick="addAppointment()">+ Add Appointment</button>
+        <!-- LEFT PAGE -->
+        <div class="page" id="left-page">
+            <h2>Daily Tasks</h2>
+            <div id="task-list"></div>
+            <button id="add-task">+ Add Task</button>
+
+            <h2 style="margin-top:20px;">Notes</h2>
+            <textarea id="notes"></textarea>
+        </div>
+
+        <!-- RIGHT PAGE -->
+        <div class="page" id="right-page">
+            <h2>Appointments</h2>
+            <div id="appointment-list"></div>
+            <button id="add-appointment">+ Add Appointment</button>
+
+            <h2 style="margin-top:20px;">Daily Tracker</h2>
+            <textarea id="tracker"></textarea>
+        </div>
     </div>
-
-    <!-- NOTES -->
-    <div class="section">
-        <h2>Notes</h2>
-        <textarea id="notes" rows="6"></textarea>
-    </div>
-
-    <!-- TRACKER -->
-    <div class="section">
-        <h2>Daily Tracker</h2>
-        <textarea id="tracker" rows="6"></textarea>
-    </div>
-
-    <button onclick="saveDay()">💾 Save</button>
-
-    <div id="statusMsg"></div>
 </div>
 
 <script src="planner.js"></script>
 </body>
 </html>
-
