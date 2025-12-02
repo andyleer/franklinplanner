@@ -1,219 +1,182 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Franklin Planner</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Franklin Planner</title>
 
-<link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #fdfdfd;
+            color: #222;
+        }
 
-<style>
-    body {
-        font-family: sans-serif;
-        margin: 0;
-        padding: 0;
-        background: #f5f5f5;
-    }
+        /* Center login box */
+        #loginScreen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            gap: 12px;
+        }
 
-    /* ---------- LOGIN SCREEN ---------- */
-    #login-screen {
-        max-width: 400px;
-        margin: 80px auto;
-        background: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 0 8px rgba(0,0,0,0.15);
-    }
+        #loginScreen input {
+            padding: 10px;
+            width: 240px;
+            font-size: 16px;
+        }
 
-    #planner {
-        display: none;
-        padding: 20px;
-    }
+        #loginScreen button {
+            padding: 10px 18px;
+            font-size: 16px;
+            margin-top: 6px;
+        }
 
-    input, select, textarea {
-        width: 100%;
-        padding: 8px;
-        margin: 6px 0;
-        box-sizing: border-box;
-    }
+        /* Planner container */
+        #plannerApp {
+            display: none;
+            padding: 15px;
+            max-width: 900px;
+            margin: auto;
+        }
 
-    .button-row {
-        margin-top: 15px;
-        display: flex;
-        gap: 10px;
-    }
+        /* Header */
+        #headerBar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
 
-    button {
-        padding: 10px 15px;
-        border: none;
-        background: #333;
-        color: white;
-        cursor: pointer;
-        border-radius: 5px;
-    }
+        #dateDisplay {
+            font-size: 22px;
+            font-weight: bold;
+        }
 
-    button:hover {
-        background: #111;
-    }
+        /* Sections */
+        .section {
+            margin-bottom: 25px;
+        }
 
-    /* ---------- LAYOUT MODES ---------- */
+        .section h2 {
+            margin: 0 0 8px 0;
+            font-size: 18px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 4px;
+        }
 
-    #controls {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 15px;
-    }
+        /* Task list */
+        .taskRow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .taskRow input[type="text"] {
+            flex: 1;
+            padding: 6px;
+        }
+        .priorityDropdown {
+            width: 55px;
+            padding: 6px;
+        }
 
-    /* Three view buttons */
-    .view-btn {
-        padding: 6px 12px;
-        font-size: 14px;
-        background: #ddd;
-        border-radius: 5px;
-        cursor: pointer;
-    }
+        /* Appointment list */
+        .apptRow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .apptRow input {
+            padding: 6px;
+        }
+        .apptTime {
+            width: 80px;
+        }
+        .apptText {
+            flex: 1;
+        }
 
-    .view-btn.active {
-        background: #222;
-        color: white;
-    }
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 10px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
 
-    /* Full two-page spread */
-    #planner-pages {
-        display: flex;
-        gap: 25px;
-    }
-
-    /* Stacked for small screens */
-    .stacked #planner-pages {
-        flex-direction: column;
-    }
-
-    /* Phone mode (clean vertical layout) */
-    .phone #planner-pages {
-        flex-direction: column;
-        gap: 10px;
-    }
-
-    /* ---------- LEFT PAGE ---------- */
-    .page {
-        background: white;
-        padding: 20px;
-        border-radius: 8px;
-        flex: 1;
-        box-shadow: 0 0 8px rgba(0,0,0,0.1);
-    }
-
-    h2 {
-        margin-top: 0;
-        margin-bottom: 10px;
-        border-bottom: 1px solid #ccc;
-        padding-bottom: 5px;
-    }
-
-    /* ---------- TASKS ---------- */
-    #task-list .task-row {
-        display: flex;
-        margin-bottom: 6px;
-        gap: 6px;
-    }
-
-    #task-list select {
-        width: 55px;
-    }
-
-    #task-list input[type='text'] {
-        flex: 1;
-    }
-
-    /* ---------- APPOINTMENTS ---------- */
-    #appointment-list .appt-row {
-        display: flex;
-        margin-bottom: 6px;
-        gap: 6px;
-    }
-
-    #appointment-list input.time {
-        width: 90px;
-    }
-
-    #appointment-list input.text {
-        flex: 1;
-    }
-
-    /* ---------- NOTES & TRACKER ---------- */
-    textarea {
-        width: 100%;
-        height: 180px;
-        resize: vertical;
-    }
-</style>
+        /* Mobile styling */
+        @media (max-width: 600px) {
+            #plannerApp {
+                padding: 10px;
+                zoom: 1.1;
+            }
+            #dateDisplay {
+                font-size: 20px;
+            }
+        }
+    </style>
 </head>
+
 <body>
 
-<!-- ========================================================= -->
-<!-- LOGIN SCREEN -->
-<!-- ========================================================= -->
-<div id="login-screen">
-    <h2>Sign In</h2>
-    <input id="login-email" type="email" placeholder="Email">
-    <input id="login-password" type="password" placeholder="Password">
+    <!-- LOGIN SCREEN -->
+    <div id="loginScreen">
+        <h2>Sign In</h2>
+        <input id="loginEmail" placeholder="Email" />
+        <input id="loginPassword" type="password" placeholder="Password" />
+        <button id="loginBtn">Log In</button>
 
-    <div class="button-row">
-        <button id="login-button">Log In</button>
-        <button id="signup-button" style="background:#555;">Create Account</button>
+        <h3>Create Account</h3>
+        <input id="signupEmail" placeholder="Email" />
+        <input id="signupPassword" type="password" placeholder="Password" />
+        <button id="signupBtn">Create Account</button>
+
+        <div id="loginError" style="color:red; margin-top:10px;"></div>
     </div>
 
-    <p id="login-error" style="color:red;"></p>
-</div>
-
-<!-- ========================================================= -->
-<!-- MAIN PLANNER -->
-<!-- ========================================================= -->
-<div id="planner">
-
-    <!-- Top Controls (Logout, date nav, view modes) -->
-    <div id="controls">
-        <button id="logout-btn">Logout</button>
-
-        <button id="prev-day">◀</button>
-        <input type="date" id="current-date">
-        <button id="next-day">▶</button>
-
-        <div style="margin-left:auto; display:flex; gap:8px;">
-            <div id="btn-full" class="view-btn active">Two-Page</div>
-            <div id="btn-stacked" class="view-btn">Stacked</div>
-            <div id="btn-phone" class="view-btn">Phone</div>
-        </div>
-    </div>
-
-    <!-- ========================================================= -->
-    <!-- TWO-PAGE LAYOUT -->
-    <!-- ========================================================= -->
-    <div id="planner-pages">
-
-        <!-- LEFT PAGE -->
-        <div class="page" id="left-page">
-            <h2>Daily Tasks</h2>
-            <div id="task-list"></div>
-            <button id="add-task">+ Add Task</button>
-
-            <h2 style="margin-top:20px;">Notes</h2>
-            <textarea id="notes"></textarea>
+    <!-- MAIN PLANNER -->
+    <div id="plannerApp">
+        <div id="headerBar">
+            <div id="dateDisplay"></div>
+            <button id="logoutBtn">Logout</button>
         </div>
 
-        <!-- RIGHT PAGE -->
-        <div class="page" id="right-page">
+        <!-- TASKS -->
+        <div class="section">
+            <h2>Tasks</h2>
+            <div id="taskList"></div>
+            <button id="addTaskBtn">Add Task</button>
+        </div>
+
+        <!-- APPOINTMENTS -->
+        <div class="section">
             <h2>Appointments</h2>
-            <div id="appointment-list"></div>
-            <button id="add-appointment">+ Add Appointment</button>
-
-            <h2 style="margin-top:20px;">Daily Tracker</h2>
-            <textarea id="tracker"></textarea>
+            <div id="apptList"></div>
+            <button id="addApptBtn">Add Appointment</button>
         </div>
-    </div>
-</div>
 
-<script src="planner.js"></script>
+        <!-- TRACKER -->
+        <div class="section">
+            <h2>Daily Tracker</h2>
+            <textarea id="trackerField"></textarea>
+        </div>
+
+        <!-- NOTES -->
+        <div class="section">
+            <h2>Notes</h2>
+            <textarea id="notesField"></textarea>
+        </div>
+
+        <button id="saveBtn" style="margin-top:20px;">Save</button>
+        <div id="saveStatus" style="margin-top:10px; color:green;"></div>
+    </div>
+
+    <script src="planner.js"></script>
+
 </body>
 </html>
