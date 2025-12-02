@@ -1,8 +1,9 @@
 // planner.js
 // Franklin-style daily planner front-end logic
-// Backend endpoints (session-based):
-//   POST /api/signup  -> {status, user_id} or {error}
-//   POST /api/login   -> {status, user_id} or {error}
+// Backend endpoints:
+//   POST /api/signup   {email, password}
+//   POST /api/login    {email, password}
+//   GET  /api/logout
 //   GET  /api/day/<YYYY-MM-DD>
 //   POST /api/day/<YYYY-MM-DD>
 
@@ -10,118 +11,234 @@
   "use strict";
 
   /* =====================================================================
-     0. SIMPLE HELPERS
+     0. SMALL HELPERS
      ===================================================================== */
-  function qs(sel) {
-    return document.querySelector(sel);
+  function todayString() {
+    return new Date().toISOString().slice(0, 10);
   }
 
-  function showAuthPanel(show) {
-    const auth = qs("#auth-panel");
-    const shell = qs("#planner-shell");
-    if (!auth || !shell) return;
-
-    auth.style.display = show ? "block" : "none";
-    shell.style.display = show ? "none" : "block";
+  function showToast(msg) {
+    let el = document.getElementById("saved-indicator");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "saved-indicator";
+      Object.assign(el.style, {
+        position: "fixed",
+        bottom: "20px",
+        right: "20px",
+        background: "#003b3b",
+        color: "#ffffff",
+        padding: "6px 12px",
+        borderRadius: "6px",
+        fontSize: "0.8rem",
+        opacity: "0",
+        transition: "opacity 0.25s ease",
+        zIndex: "9999"
+      });
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.style.opacity = "1";
+    setTimeout(() => { el.style.opacity = "0"; }, 1200);
   }
 
-  function setAuthError(msg) {
-    const el = qs("#auth-error");
-    if (!el) return;
-    if (!msg) {
-      el.style.display = "none";
-      el.textContent = "";
-    } else {
-      el.style.display = "block";
-      el.textContent = msg;
+  async function apiFetch(path, options = {}) {
+    const { method = "GET", body } = options;
+
+    const fetchOptions = {
+      method,
+      credentials: "include", // IMPORTANT: send cookies for auth
+      headers: {
+        "Accept": "application/json"
+      }
+    };
+
+    if (body !== undefined) {
+      fetchOptions.headers["Content-Type"] = "application/json";
+      fetchOptions.body = JSON.stringify(body);
+    }
+
+    const res = await fetch(path, fetchOptions);
+    return res;
+  }
+
+  /* =====================================================================
+     1. AUTH UI
+     ===================================================================== */
+  let currentEmail = null;
+
+  function setAuthUI(loggedIn, email) {
+    const loggedOutDiv = document.getElementById("auth-logged-out");
+    const loggedInDiv = document.getElementById("auth-logged-in");
+    const emailSpan = document.getElementById("auth-email-display");
+    const statusSpan = document.getElementById("auth-status");
+
+    if (loggedOutDiv && loggedInDiv) {
+      if (loggedIn) {
+        loggedOutDiv.style.display = "none";
+        loggedInDiv.style.display = "flex";
+        if (emailSpan) emailSpan.textContent = email || "";
+        if (statusSpan) statusSpan.textContent = "";
+      } else {
+        loggedOutDiv.style.display = "flex";
+        loggedInDiv.style.display = "none";
+        if (statusSpan) statusSpan.textContent = "";
+      }
+    }
+    currentEmail = loggedIn ? email : null;
+  }
+
+  async function handleSignup() {
+    const emailInput = document.getElementById("auth-email");
+    const passwordInput = document.getElementById("auth-password");
+    if (!emailInput || !passwordInput) return;
+
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      showToast("Email & password required");
+      return;
+    }
+
+    try {
+      const res = await apiFetch("/api/signup", {
+        method: "POST",
+        body: { email, password }
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || "Signup failed");
+        return;
+      }
+
+      setAuthUI(true, email);
+      showToast("Account created");
+      // After signup, load today's data
+      const activeDate = getActiveDate();
+      updateHeader(activeDate);
+      loadEntry(activeDate);
+    } catch (err) {
+      console.error("Signup error:", err);
+      showToast("Signup error");
     }
   }
 
+  async function handleLogin() {
+    const emailInput = document.getElementById("auth-email");
+    const passwordInput = document.getElementById("auth-password");
+    if (!emailInput || !passwordInput) return;
+
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      showToast("Email & password required");
+      return;
+    }
+
+    try {
+      const res = await apiFetch("/api/login", {
+        method: "POST",
+        body: { email, password }
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || "Login failed");
+        return;
+      }
+
+      setAuthUI(true, email);
+      showToast("Logged in");
+      const activeDate = getActiveDate();
+      updateHeader(activeDate);
+      loadEntry(activeDate);
+    } catch (err) {
+      console.error("Login error:", err);
+      showToast("Login error");
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await apiFetch("/api/logout", { method: "GET" });
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+    setAuthUI(false, null);
+    showToast("Logged out");
+    // Clear planner UI
+    applyPlannerState({
+      tasks: [],
+      tracker: "",
+      appointments: [],
+      notes: ""
+    });
+  }
+
+  async function detectExistingSession() {
+    // Simple check: try to load today's day; if 200, assume logged in
+    const d = todayString();
+    try {
+      const res = await apiFetch(`/api/day/${d}`, { method: "GET" });
+      if (res.status === 401) {
+        setAuthUI(false, null);
+        return;
+      }
+      if (res.ok) {
+        // We don't know email from server, just mark as logged in.
+        // User will see "Logged in" but not email unless they log in again.
+        setAuthUI(true, currentEmail || "Session");
+        const data = await res.json().catch(() => null);
+        if (data && data.date) {
+          // Use actual planner load later in initPlanner, this just sets auth state
+        }
+      } else {
+        setAuthUI(false, null);
+      }
+    } catch (err) {
+      console.error("Session check error:", err);
+      setAuthUI(false, null);
+    }
+  }
+
+  function initAuth() {
+    const signupBtn = document.getElementById("auth-signup");
+    const loginBtn = document.getElementById("auth-login");
+    const logoutBtn = document.getElementById("auth-logout");
+
+    if (signupBtn && !signupBtn._bound) {
+      signupBtn.addEventListener("click", handleSignup);
+      signupBtn._bound = true;
+    }
+    if (loginBtn && !loginBtn._bound) {
+      loginBtn.addEventListener("click", handleLogin);
+      loginBtn._bound = true;
+    }
+    if (logoutBtn && !logoutBtn._bound) {
+      logoutBtn.addEventListener("click", handleLogout);
+      logoutBtn._bound = true;
+    }
+
+    // Initial state: assume logged out, then probe
+    setAuthUI(false, null);
+    detectExistingSession();
+  }
+
+  /* =====================================================================
+     2. DATE UTIL
+     ===================================================================== */
   function getActiveDate() {
-    const dateInput = qs("#date-input");
-    const today = new Date().toISOString().slice(0, 10);
+    const dateInput = document.getElementById("date-input");
+    const today = todayString();
     if (!dateInput) return today;
     return dateInput.value || today;
   }
 
   /* =====================================================================
-     1. AUTH – SIGNUP + LOGIN
-     ===================================================================== */
-  async function apiSignup(email, password) {
-    const res = await fetch("/api/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ email, password })
-    });
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.error || "Sign up failed");
-    }
-    return data;
-  }
-
-  async function apiLogin(email, password) {
-    const res = await fetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ email, password })
-    });
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.error || "Login failed");
-    }
-    return data;
-  }
-
-  function wireAuthHandlers() {
-    const loginBtn = qs("#login-btn");
-    const signupBtn = qs("#signup-btn");
-    const emailInput = qs("#auth-email");
-    const pwInput = qs("#auth-password");
-
-    if (loginBtn) {
-      loginBtn.addEventListener("click", async () => {
-        setAuthError("");
-        const email = (emailInput?.value || "").trim();
-        const pw = pwInput?.value || "";
-        if (!email || !pw) {
-          setAuthError("Email and password are required.");
-          return;
-        }
-        try {
-          await apiLogin(email, pw);
-          await onAuthenticated();
-        } catch (err) {
-          setAuthError(err.message || "Login failed");
-        }
-      });
-    }
-
-    if (signupBtn) {
-      signupBtn.addEventListener("click", async () => {
-        setAuthError("");
-        const email = (emailInput?.value || "").trim();
-        const pw = pwInput?.value || "";
-        if (!email || !pw) {
-          setAuthError("Email and password are required.");
-          return;
-        }
-        try {
-          await apiSignup(email, pw);
-          await onAuthenticated();
-        } catch (err) {
-          setAuthError(err.message || "Sign up failed");
-        }
-      });
-    }
-  }
-
-  /* =====================================================================
-     2. PLANNER DATA – COLLECT & APPLY
+     3. COLLECT + APPLY STATE
      ===================================================================== */
   function collectPlannerState() {
     const tasks = Array.from(
@@ -152,9 +269,9 @@
     return {
       date: getActiveDate(),
       tasks,
-      tracker: qs("#tracker")?.value || "",
+      tracker: document.getElementById("tracker")?.value || "",
       appointments,
-      notes: qs("#notes")?.value || ""
+      notes: document.getElementById("notes")?.value || ""
     };
   }
 
@@ -162,8 +279,8 @@
     const tasks = Array.isArray(data.tasks) ? data.tasks : [];
     const appointments = Array.isArray(data.appointments) ? data.appointments : [];
 
-    // TASKS
-    const list = qs("#task-list");
+    // ----- Tasks -----
+    const list = document.getElementById("task-list");
     if (list) {
       list.innerHTML = "";
 
@@ -193,17 +310,16 @@
         });
       }
 
-      // If no tasks from DB, create 6 blank rows
       if (list.children.length === 0) {
         for (let i = 0; i < 6; i++) addBlankTask();
       }
     }
 
-    // TRACKER
-    const trackerEl = qs("#tracker");
+    // ----- Tracker -----
+    const trackerEl = document.getElementById("tracker");
     if (trackerEl) trackerEl.value = data.tracker || "";
 
-    // APPOINTMENTS
+    // ----- Appointments -----
     const apptRows = document.querySelectorAll(".appt-row");
     appointments.forEach((a, i) => {
       if (!apptRows[i]) return;
@@ -211,13 +327,13 @@
       if (input) input.value = a.text || "";
     });
 
-    // NOTES
-    const notesEl = qs("#notes");
+    // ----- Notes -----
+    const notesEl = document.getElementById("notes");
     if (notesEl) notesEl.value = data.notes || "";
   }
 
   /* =====================================================================
-     3. SAVE / LOAD (with debounce)
+     4. SAVE (with debounce)
      ===================================================================== */
   let saveTimer = null;
 
@@ -228,75 +344,56 @@
 
   async function saveEntry() {
     const state = collectPlannerState();
-    const date = state.date || new Date().toISOString().slice(0, 10);
+    const date = state.date || todayString();
 
     try {
-      const res = await fetch(`/api/day/${date}`, {
+      const res = await apiFetch(`/api/day/${date}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(state)
+        body: state
       });
 
+      if (res.status === 401) {
+        showToast("Please log in to save");
+        setAuthUI(false, null);
+        return;
+      }
+
       if (!res.ok) {
-        // If unauthorized, kick back to login
-        if (res.status === 401) {
-          showAuthPanel(true);
-        }
         console.error("Save failed", res.status, await res.text());
+        showToast("Save failed");
         return;
       }
 
       const json = await res.json().catch(() => ({}));
-      if (json && (json.status === "ok" || json.status === "saved" || json.id)) {
-        showSavedIndicator();
+      if (json && (json.status === "ok" || json.status === "saved")) {
+        showToast("Saved");
       } else {
-        showSavedIndicator();
+        showToast("Saved");
       }
     } catch (err) {
       console.error("Save error:", err);
+      showToast("Save error");
     }
   }
 
-  function showSavedIndicator() {
-    let el = document.getElementById("saved-indicator");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "saved-indicator";
-      el.textContent = "Saved";
-      Object.assign(el.style, {
-        position: "fixed",
-        bottom: "20px",
-        right: "20px",
-        background: "#003b3b",
-        color: "#ffffff",
-        padding: "6px 12px",
-        borderRadius: "6px",
-        fontSize: "0.8rem",
-        opacity: "0",
-        transition: "opacity 0.25s ease",
-        zIndex: "9999"
-      });
-      document.body.appendChild(el);
-    }
-    el.style.opacity = "1";
-    setTimeout(() => {
-      el.style.opacity = "0";
-    }, 1100);
-  }
-
+  /* =====================================================================
+     5. LOAD
+     ===================================================================== */
   async function loadEntry(dateStr) {
     const date = dateStr || getActiveDate();
 
     try {
-      const res = await fetch(`/api/day/${date}`, {
-        method: "GET",
-        credentials: "include"
-      });
+      const res = await apiFetch(`/api/day/${date}`, { method: "GET" });
 
       if (res.status === 401) {
-        // Not logged in
-        showAuthPanel(true);
+        console.warn("Not logged in when loading day");
+        setAuthUI(false, null);
+        applyPlannerState({
+          tasks: [],
+          tracker: "",
+          appointments: [],
+          notes: ""
+        });
         return;
       }
 
@@ -325,10 +422,10 @@
   }
 
   /* =====================================================================
-     4. TASK ROWS
+     6. TASK ROWS
      ===================================================================== */
   function addBlankTask() {
-    const list = qs("#task-list");
+    const list = document.getElementById("task-list");
     if (!list) return;
 
     const row = document.createElement("div");
@@ -348,15 +445,15 @@
   }
 
   /* =====================================================================
-     5. DATE HEADER + MINI CALENDARS
+     7. DATE HEADER + MINI CALENDARS
      ===================================================================== */
   function updateHeader(dateStr) {
     if (!dateStr) return;
     const d = new Date(dateStr + "T00:00:00");
 
-    const dayNumberEl = qs("#day-number");
-    const weekdayEl = qs("#weekday");
-    const monthYearEl = qs("#month-year");
+    const dayNumberEl = document.getElementById("day-number");
+    const weekdayEl = document.getElementById("weekday");
+    const monthYearEl = document.getElementById("month-year");
 
     if (dayNumberEl) dayNumberEl.textContent = d.getDate();
 
@@ -406,12 +503,10 @@
     const first = new Date(shownYear, shownMonth, 1);
     const last = new Date(shownYear, shownMonth + 1, 0);
 
-    // leading blanks
     for (let i = 0; i < first.getDay(); i++) {
       grid.appendChild(document.createElement("div"));
     }
 
-    // days
     for (let day = 1; day <= last.getDate(); day++) {
       const div = document.createElement("div");
       div.textContent = day;
@@ -432,11 +527,11 @@
   }
 
   /* =====================================================================
-     6. LAYOUT TOGGLES & PHONE VIEW
+     8. LAYOUT TOGGLES
      ===================================================================== */
   function setupLayoutToggle() {
-    const toggleBtn = qs("#toggleLayout");
-    const spread = qs("#spread");
+    const toggleBtn = document.getElementById("toggleLayout");
+    const spread = document.getElementById("spread");
     if (!toggleBtn || !spread) return;
 
     if (toggleBtn._plannerHooked) return;
@@ -451,33 +546,34 @@
   }
 
   function setupPhoneViewToggle() {
-    const phoneBtn = qs("#phoneViewBtn");
-    const spread = qs("#spread");
-    if (!phoneBtn || !spread) return;
+    const phoneBtn = document.getElementById("phoneViewBtn");
+    const spread = document.getElementById("spread");
+    if (!phoneBtn) return;
 
     if (phoneBtn._plannerHooked) return;
     phoneBtn._plannerHooked = true;
 
+    // Auto-enable on small screens
+    if (window.innerWidth <= 768) {
+      document.body.classList.add("phone-view");
+      if (spread) spread.classList.add("stacked");
+      phoneBtn.textContent = "Exit Phone View";
+    }
+
     phoneBtn.addEventListener("click", () => {
       const body = document.body;
       const isPhone = body.classList.toggle("phone-view");
+
       phoneBtn.textContent = isPhone ? "Exit Phone View" : "Phone View";
-      if (isPhone && spread) {
+
+      if (spread && isPhone) {
         spread.classList.add("stacked");
       }
     });
-
-    // Auto-enable phone view on small screens initially
-    if (window.innerWidth <= 768) {
-      document.body.classList.add("phone-view");
-      phoneBtn.textContent = "Exit Phone View";
-      const spreadEl = qs("#spread");
-      if (spreadEl) spreadEl.classList.add("stacked");
-    }
   }
 
   /* =====================================================================
-     7. EVENT WIRING & INIT
+     9. EVENT WIRING & INIT
      ===================================================================== */
   function attachAutoSaveListeners() {
     if (document.body._plannerBound) return;
@@ -494,36 +590,29 @@
     loadEntry(date);
   }
 
-  let plannerInitialized = false;
+  function initPlanner() {
+    const dateInput = document.getElementById("date-input");
+    const addTaskBtn = document.getElementById("add-task");
 
-  async function initPlanner(activeDate, initialData) {
-    const dateInput = qs("#date-input");
-    const addTaskBtn = qs("#add-task");
-
-    // Initialize date to provided or today
-    const today = new Date().toISOString().slice(0, 10);
-    const dateToUse = activeDate || today;
-
+    const today = todayString();
+    let activeDate = today;
     if (dateInput) {
       if (!dateInput.value) {
-        dateInput.value = dateToUse;
-      } else {
-        // if value already set, keep it
+        dateInput.value = today;
       }
+      activeDate = dateInput.value;
     }
 
-    updateHeader(dateToUse);
+    updateHeader(activeDate);
     attachAutoSaveListeners();
     setupLayoutToggle();
     setupPhoneViewToggle();
 
-    // Date change handler
     if (dateInput && !dateInput._plannerHooked) {
       dateInput.addEventListener("change", onDateChange);
       dateInput._plannerHooked = true;
     }
 
-    // Add-task button
     if (addTaskBtn && !addTaskBtn._plannerHooked) {
       addTaskBtn.addEventListener("click", () => {
         addBlankTask();
@@ -532,86 +621,28 @@
       addTaskBtn._plannerHooked = true;
     }
 
-    // Ensure blank rows exist before loading
-    const list = qs("#task-list");
+    const list = document.getElementById("task-list");
     if (list && list.children.length === 0) {
       for (let i = 0; i < 6; i++) addBlankTask();
     }
 
-    if (initialData) {
-      applyPlannerState(initialData);
-    } else {
-      await loadEntry(dateToUse);
-    }
-
-    plannerInitialized = true;
+    // Finally load data for the active date
+    loadEntry(activeDate);
   }
 
-  async function onAuthenticated() {
-    // Hide auth, show planner, then load today's data
-    showAuthPanel(false);
-
-    const today = new Date().toISOString().slice(0, 10);
-    if (!plannerInitialized) {
-      await initPlanner(today, null);
-    } else {
-      // If planner already initialized (e.g., user logged in after 401 during save),
-      // just reload the current date.
-      await loadEntry(getActiveDate());
-    }
-  }
-
-  async function bootstrap() {
-    wireAuthHandlers();
-
-    // Try to auto-detect an existing session by probing today's day
-    const today = new Date().toISOString().slice(0, 10);
-
-    try {
-      const res = await fetch(`/api/day/${today}`, {
-        method: "GET",
-        credentials: "include"
-      });
-
-      if (res.status === 401) {
-        // Not logged in
-        showAuthPanel(true);
-        return;
-      }
-
-      if (!res.ok) {
-        // Logged in but no data yet – still go to planner
-        showAuthPanel(false);
-        await initPlanner(today, {
-          date: today,
-          tasks: [],
-          appointments: [],
-          tracker: "",
-          notes: ""
-        });
-        return;
-      }
-
-      const data = await res.json().catch(() => ({}));
-      showAuthPanel(false);
-      await initPlanner(today, data || {});
-    } catch (err) {
-      console.error("Bootstrap error:", err);
-      showAuthPanel(true);
-    }
-  }
-
-  document.addEventListener("DOMContentLoaded", bootstrap);
+  document.addEventListener("DOMContentLoaded", () => {
+    initAuth();
+    initPlanner();
+  });
 
   /* =====================================================================
-     8. Expose some helpers for console debugging if needed
+     10. Expose for debugging (optional)
      ===================================================================== */
-  window._planner = {
-    collectPlannerState,
-    saveEntry,
-    loadEntry,
-    updateHeader,
-    renderAllCalendars,
-    addBlankTask
-  };
+  window.collectPlannerState = collectPlannerState;
+  window.saveEntryDebounced = saveEntryDebounced;
+  window.saveEntry = saveEntry;
+  window.loadEntry = loadEntry;
+  window.addBlankTask = addBlankTask;
+  window.updateHeader = updateHeader;
+  window.renderAllCalendars = renderAllCalendars;
 })();
