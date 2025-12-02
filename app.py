@@ -229,7 +229,7 @@ if __name__ == "__main__":
 # ---------------------------------------------------------
 # USER AUTH ROUTES
 # ---------------------------------------------------------
-@app.route("/api/signup", method=["POST"])
+@app.route("/api/signup", methods=["POST"])
 def signup():
     data = request.json
     email = data.get("email")
