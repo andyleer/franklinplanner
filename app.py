@@ -1,25 +1,25 @@
 import os
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, session, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
-from flask_bcrypt import Bcrypt
 from flask_cors import CORS
+from werkzeug.security import generate_password_hash, check_password_hash
 
-# ---------------------------------------------------------
-# App setup
-# ---------------------------------------------------------
 app = Flask(__name__, static_folder=".", static_url_path="")
-CORS(app)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
-app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "dev-default-key")
+# ---------------------------------------------------------------------
+# CONFIG
+# ---------------------------------------------------------------------
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret")
+
+CORS(app, supports_credentials=True)
 
 db = SQLAlchemy(app)
-bcrypt = Bcrypt(app)
 
-# ---------------------------------------------------------
-# DATABASE MODELS
-# ---------------------------------------------------------
+# ---------------------------------------------------------------------
+# MODELS
+# ---------------------------------------------------------------------
 class User(db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
@@ -30,10 +30,194 @@ class User(db.Model):
 class Day(db.Model):
     __tablename__ = "days"
     id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.String, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    date = db.Column(db.String)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    tracker = db.Column(db.Text)
+    notes = db.Column(db.Text)
 
-    tasks_json = db.Column(db.JSON)
+    appointments = db.relationship("Appointment", cascade="all, delete-orphan")
+    tasks = db.relationship("Task", cascade="all, delete-orphan")
+
+
+class Task(db.Model):
+    __tablename__ = "tasks"
+    id = db.Column(db.Integer, primary_key=True)
+    day_id = db.Column(db.Integer, db.ForeignKey("days.id"))
+    checked = db.Column(db.Boolean)
+    priority = db.Column(db.String)
+    description = db.Column(db.String)
+
+
+class Appointment(db.Model):
+    __tablename__ = "appointments"
+    id = db.Column(db.Integer, primary_key=True)
+    day_id = db.Column(db.Integer, db.ForeignKey("days.id"))
+    time = db.Column(db.String)
+    text = db.Column(db.String)
+
+
+# ---------------------------------------------------------------------
+# AUTH HELPERS
+# ---------------------------------------------------------------------
+def require_login():
+    if "user_id" not in session:
+        return False
+    return True
+
+
+# ---------------------------------------------------------------------
+# AUTH ENDPOINTS
+# ---------------------------------------------------------------------
+@app.post("/api/signup")
+def signup():
+    data = request.json
+    email = data.get("email", "").lower().strip()
+    password = data.get("password", "")
+    if not email or not password:
+        return jsonify({"error": "Email and password required"}), 400
+
+    # Check existing
+    if User.query.filter_by(email=email).first():
+        return jsonify({"error": "Email already exists"}), 400
+
+    user = User(
+        email=email,
+        password_hash=generate_password_hash(password)
+    )
+    db.session.add(user)
+    db.session.commit()
+
+    session["user_id"] = user.id
+    return jsonify({"status": "ok", "user_id": user.id})
+
+
+@app.post("/api/login")
+def login():
+    data = request.json
+    email = data.get("email", "").lower().strip()
+    password = data.get("password", "")
+
+    user = User.query.filter_by(email=email).first()
+    if not user or not check_password_hash(user.password_hash, password):
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    session["user_id"] = user.id
+    return jsonify({"status": "ok", "user_id": user.id})
+
+
+@app.get("/api/logout")
+def logout():
+    session.clear()
+    return jsonify({"status": "ok"})
+
+
+# ---------------------------------------------------------------------
+# MAIN SAVE / LOAD ENDPOINTS (PER USER)
+# ---------------------------------------------------------------------
+@app.get("/api/day/<date>")
+def load_day(date):
+    if not require_login():
+        return jsonify({"error": "Not logged in"}), 401
+
+    user_id = session["user_id"]
+    day = Day.query.filter_by(user_id=user_id, date=date).first()
+
+    if not day:
+        return jsonify({
+            "date": date,
+            "tasks": [],
+            "appointments": [],
+            "tracker": "",
+            "notes": ""
+        }), 200
+
+    return jsonify({
+        "date": date,
+        "tasks": [
+            {"checked": t.checked, "priority": t.priority, "description": t.description}
+            for t in day.tasks
+        ],
+        "appointments": [
+            {"time": a.time, "text": a.text}
+            for a in day.appointments
+        ],
+        "tracker": day.tracker or "",
+        "notes": day.notes or ""
+    })
+
+
+@app.post("/api/day/<date>")
+def save_day(date):
+    if not require_login():
+        return jsonify({"error": "Not logged in"}), 401
+
+    user_id = session["user_id"]
+    data = request.json
+
+    day = Day.query.filter_by(user_id=user_id, date=date).first()
+    if not day:
+        day = Day(date=date, user_id=user_id)
+        db.session.add(day)
+        db.session.commit()
+
+    # Update fields
+    day.tracker = data.get("tracker", "")
+    day.notes = data.get("notes", "")
+
+    # Clear old tasks/appointments
+    Task.query.filter_by(day_id=day.id).delete()
+    Appointment.query.filter_by(day_id=day.id).delete()
+
+    # Insert new tasks
+    for t in data.get("tasks", []):
+        task = Task(
+            day_id=day.id,
+            checked=t.get("checked", False),
+            priority=t.get("priority", "A"),
+            description=t.get("description", "")
+        )
+        db.session.add(task)
+
+    # Insert new appointments
+    for a in data.get("appointments", []):
+        appt = Appointment(
+            day_id=day.id,
+            time=a.get("time", ""),
+            text=a.get("text", "")
+        )
+        db.session.add(appt)
+
+    db.session.commit()
+
+    return jsonify({"status": "saved"})
+
+
+# ---------------------------------------------------------------------
+# STATIC FILES
+# ---------------------------------------------------------------------
+@app.get("/")
+def serve_index():
+    return send_from_directory(".", "index.html")
+
+
+@app.get("/<path:path>")
+def static_proxy(path):
+    return send_from_directory(".", path)
+
+
+# ---------------------------------------------------------------------
+# HEALTH CHECK
+# ---------------------------------------------------------------------
+@app.get("/health")
+def health():
+    return "ok"
+
+
+# ---------------------------------------------------------------------
+# MAIN
+# ---------------------------------------------------------------------
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
     tracker = db.Column(db.Text)
     notes = db.Column(db.Text)
 
