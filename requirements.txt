@@ -3,4 +3,7 @@ Flask-SQLAlchemy
 SQLAlchemy
 gunicorn
 psycopg2-binary
-
+flask
+flask_sqlalchemy
+flask_bcrypt
+flask_cors
