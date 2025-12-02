@@ -1,206 +1,182 @@
-// -------------------------------
-// GLOBALS
-// -------------------------------
+/* -------------------------------------------------------
+   Franklin Planner – Frontend Logic
+------------------------------------------------------- */
+
 let currentDate = null;
 
-// -------------------------------
-// AUTH HANDLERS
-// -------------------------------
-async function signup() {
-    const email = document.getElementById("signup-email").value.trim();
-    const pw = document.getElementById("signup-password").value.trim();
+/* --------------------------
+   LOGIN / SIGNUP HANDLERS
+--------------------------- */
 
-    const res = await fetch("/api/signup", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        credentials: "include",
-        body: JSON.stringify({ email, password: pw })
-    });
-
-    const data = await res.json();
-    console.log("Signup:", data);
-
-    if (data.error) {
-        alert(data.error);
-        return;
-    }
-
-    hideAuthShowPlanner();
-}
-
-async function login() {
+document.getElementById("login-btn").onclick = async () => {
     const email = document.getElementById("login-email").value.trim();
-    const pw = document.getElementById("login-password").value.trim();
+    const pw = document.getElementById("login-password").value;
 
     const res = await fetch("/api/login", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ email, password: pw })
     });
 
     const data = await res.json();
-    console.log("Login:", data);
-
     if (data.error) {
         alert(data.error);
         return;
     }
 
-    hideAuthShowPlanner();
-    loadToday();
-}
+    showPlanner();
+};
 
-async function logout() {
-    await fetch("/api/logout", {
+document.getElementById("signup-btn").onclick = async () => {
+    const email = document.getElementById("signup-email").value.trim();
+    const pw = document.getElementById("signup-password").value;
+
+    const res = await fetch("/api/signup", {
         method: "POST",
-        credentials: "include"
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password: pw })
     });
 
-    document.getElementById("auth-section").style.display = "block";
-    document.getElementById("planner-section").style.display = "none";
+    const data = await res.json();
+    if (data.error) {
+        alert(data.error);
+        return;
+    }
+
+    showPlanner();
+};
+
+function showPlanner() {
+    document.getElementById("auth-screen").style.display = "none";
+    document.getElementById("planner-screen").style.display = "block";
+
+    const today = new Date().toISOString().slice(0, 10);
+    loadDay(today);
 }
 
-// -------------------------------
-// UI HELPERS
-// -------------------------------
-function hideAuthShowPlanner() {
-    document.getElementById("auth-section").style.display = "none";
-    document.getElementById("planner-section").style.display = "block";
-}
+/* --------------------------
+   LOAD A DAY
+--------------------------- */
+async function loadDay(date) {
+    currentDate = date;
 
-// -------------------------------
-// DATE HELPERS
-// -------------------------------
-function loadToday() {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, "0");
-    const dd = String(today.getDate()).padStart(2, "0");
-    loadDay(`${yyyy}-${mm}-${dd}`);
-}
-
-async function loadDay(dateStr) {
-    currentDate = dateStr;
-    document.getElementById("current-date-label").innerText = dateStr;
-
-    const res = await fetch(`/api/day/${dateStr}`, {
+    const res = await fetch(`/api/day/${date}`, {
         method: "GET",
         credentials: "include"
     });
 
     const data = await res.json();
-    console.log("Loaded Day:", data);
-
     if (data.error) {
-        alert("Please log in again.");
+        alert("Session expired, please log in again.");
+        location.reload();
         return;
     }
 
-    renderTasks(data.tasks || []);
-    renderAppointments(data.appointments || []);
-
     document.getElementById("notes").value = data.notes || "";
     document.getElementById("tracker").value = data.tracker || "";
+
+    // Tasks
+    const taskList = document.getElementById("task-list");
+    taskList.innerHTML = "";
+    (data.tasks || []).forEach(t => addTask(t.priority, t.description, t.checked));
+
+    // Appointments
+    const apptList = document.getElementById("appointment-list");
+    apptList.innerHTML = "";
+    (data.appointments || []).forEach(a => addAppointment(a.time, a.text));
 }
 
-async function saveDay() {
-    if (!currentDate) return;
-
+/* --------------------------
+   SAVE A DAY
+--------------------------- */
+document.getElementById("save-btn").onclick = async () => {
     const payload = {
         notes: document.getElementById("notes").value,
         tracker: document.getElementById("tracker").value,
-        tasks: collectTasks(),
-        appointments: collectAppointments()
+        tasks: gatherTasks(),
+        appointments: gatherAppointments()
     };
-
-    console.log("Saving payload:", payload);
 
     const res = await fetch(`/api/day/${currentDate}`, {
         method: "POST",
         credentials: "include",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
     });
 
     const data = await res.json();
-    console.log("Save Response:", data);
-}
+    if (data.status !== "ok") alert("Save failed");
+};
 
-// -------------------------------
-// TASKS
-// -------------------------------
-function renderTasks(tasks) {
-    const container = document.getElementById("task-list");
-    container.innerHTML = "";
-
-    tasks.forEach(t => addTaskRow(t.priority, t.description, t.checked));
-}
-
-function addTaskRow(priority = "A", description = "", checked = false) {
-    const container = document.getElementById("task-list");
-
-    const row = document.createElement("div");
-    row.className = "task-row";
-
-    row.innerHTML = `
-        <input type="checkbox" class="task-check" ${checked ? "checked" : ""}>
-        <select class="task-priority">
-            <option ${priority === "A" ? "selected" : ""}>A</option>
-            <option ${priority === "B" ? "selected" : ""}>B</option>
-            <option ${priority === "C" ? "selected" : ""}>C</option>
-        </select>
-        <input class="task-desc" value="${description}">
-    `;
-
-    container.appendChild(row);
-}
-
-function collectTasks() {
-    const rows = document.querySelectorAll(".task-row");
-    return Array.from(rows).map(row => ({
-        checked: row.querySelector(".task-check").checked,
+function gatherTasks() {
+    return [...document.querySelectorAll(".task-row")].map(row => ({
         priority: row.querySelector(".task-priority").value,
-        description: row.querySelector(".task-desc").value
+        description: row.querySelector(".task-desc").value,
+        checked: row.querySelector(".task-check").checked
     }));
 }
 
-// -------------------------------
-// APPOINTMENTS
-// -------------------------------
-function renderAppointments(appts) {
-    const container = document.getElementById("appointment-list");
-    container.innerHTML = "";
-
-    appts.forEach(a => addAppointmentRow(a.time, a.text));
-}
-
-function addAppointmentRow(time = "", text = "") {
-    const container = document.getElementById("appointment-list");
-
-    const row = document.createElement("div");
-    row.className = "appt-row";
-
-    row.innerHTML = `
-        <input class="appt-time" placeholder="Time" value="${time}">
-        <input class="appt-text" placeholder="Description" value="${text}">
-    `;
-
-    container.appendChild(row);
-}
-
-function collectAppointments() {
-    const rows = document.querySelectorAll(".appt-row");
-    return Array.from(rows).map(row => ({
+function gatherAppointments() {
+    return [...document.querySelectorAll(".appt-row")].map(row => ({
         time: row.querySelector(".appt-time").value,
         text: row.querySelector(".appt-text").value
     }));
 }
 
-// -------------------------------
-// BUTTON HOOKS
-// -------------------------------
-document.getElementById("btn-save").onclick = saveDay;
-document.getElementById("btn-add-task").onclick = () => addTaskRow();
-document.getElementById("btn-add-appt").onclick = () => addAppointmentRow();
-document.getElementById("btn-today").onclick = loadToday;
+/* --------------------------
+   TASK UI HELPERS
+--------------------------- */
+function addTask(priority = "A", description = "", checked = false) {
+    const el = document.createElement("div");
+    el.className = "task-row";
+    el.innerHTML = `
+        <input type="checkbox" class="task-check" ${checked ? "checked" : ""}>
+        <select class="task-priority">
+            <option value="A" ${priority === "A" ? "selected" : ""}>A</option>
+            <option value="B" ${priority === "B" ? "selected" : ""}>B</option>
+            <option value="C" ${priority === "C" ? "selected" : ""}>C</option>
+        </select>
+        <input class="task-desc" value="${description}">
+        <button class="delete-task">X</button>
+    `;
+
+    el.querySelector(".delete-task").onclick = () => el.remove();
+    document.getElementById("task-list").appendChild(el);
+}
+
+document.getElementById("add-task-btn").onclick = () => addTask();
+
+/* --------------------------
+   APPOINTMENT UI HELPERS
+--------------------------- */
+function addAppointment(time = "", text = "") {
+    const el = document.createElement("div");
+    el.className = "appt-row";
+    el.innerHTML = `
+        <input class="appt-time" type="time" value="${time}">
+        <input class="appt-text" value="${text}">
+        <button class="delete-appt">X</button>
+    `;
+
+    el.querySelector(".delete-appt").onclick = () => el.remove();
+    document.getElementById("appointment-list").appendChild(el);
+}
+
+document.getElementById("add-appt-btn").onclick = () => addAppointment();
+
+/* --------------------------
+   DATE NAVIGATION
+--------------------------- */
+document.getElementById("prev-day").onclick = () => {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() - 1);
+    loadDay(d.toISOString().slice(0, 10));
+};
+
+document.getElementById("next-day").onclick = () => {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() + 1);
+    loadDay(d.toISOString().slice(0, 10));
+};
