@@ -1,39 +1,261 @@
-// planner.js
+// planner.js — matches your final backend EXACTLY
 
 (function () {
-  // ---- DOM helpers ----
-  const qs = (sel) => document.querySelector(sel);
-  const qsa = (sel) => Array.from(document.querySelectorAll(sel));
+    let currentUserId = null;
+    let saveTimer = null;
 
-  // Auth
-  const authSection = qs("#auth-section");
-  const loginForm = qs("#login-form");
-  const signupForm = qs("#signup-form");
-  const loginEmail = qs("#login-email");
-  const loginPassword = qs("#login-password");
-  const signupEmail = qs("#signup-email");
-  const signupPassword = qs("#signup-password");
-  const toggleToSignup = qs("#toggle-to-signup");
-  const headerRight = qs("#header-right");
+    /* ==========================================================
+       AUTH
+    ========================================================== */
 
-  // Planner
-  const plannerSection = qs("#planner-section");
-  const userChip = qs("#user-chip");
-  const dateInput = qs("#date-input");
-  const currentDateLabel = qs("#current-date-label");
-  const prevDayBtn = qs("#prev-day-btn");
-  const nextDayBtn = qs("#next-day-btn");
-  const todayBtn = qs("#today-btn");
-  const logoutBtn = qs("#logout-btn");
-  const saveBtn = qs("#save-btn");
-  const tasksBody = qs("#tasks-body");
-  const appointmentsBody = qs("#appointments-body");
-  const addTaskBtn = qs("#add-task-btn");
-  const addAppointmentBtn = qs("#add-appointment-btn");
-  const notesEl = qs("#notes");
-  const trackerEl = qs("#tracker");
-  const statusBar = qs("#status-bar");
+    async function login(email, password) {
+        const res = await fetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password })
+        });
 
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Login failed");
+
+        currentUserId = data.user_id;
+    }
+
+    async function signup(email, password) {
+        const res = await fetch("/api/signup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Signup failed");
+
+        currentUserId = data.user_id;
+    }
+
+    async function logout() {
+        await fetch("/api/logout", { method: "POST" });
+        currentUserId = null;
+    }
+
+    /* ==========================================================
+       UI TRANSITIONS
+    ========================================================== */
+
+    function showPlanner() {
+        document.getElementById("auth-container").classList.add("hidden");
+        document.getElementById("planner-container").classList.remove("hidden");
+    }
+
+    function showAuth() {
+        document.getElementById("planner-container").classList.add("hidden");
+        document.getElementById("auth-container").classList.remove("hidden");
+    }
+
+    /* ==========================================================
+       MINI CALENDAR
+    ========================================================== */
+
+    function renderMiniCalendar(id, year, month) {
+        const container = document.getElementById(id);
+        container.innerHTML = "";
+
+        const d = new Date(year, month, 1);
+        const firstDay = new Date(year, month, 1).getDay();
+        const lastDay = new Date(year, month + 1, 0).getDate();
+
+        const title = document.createElement("div");
+        title.style.textAlign = "center";
+        title.style.fontWeight = "bold";
+        title.textContent = d.toLocaleString("default", {
+            month: "short",
+            year: "numeric"
+        });
+        container.appendChild(title);
+
+        const grid = document.createElement("div");
+        grid.className = "mini-cal-grid";
+
+        ["S","M","T","W","T","F","S"].forEach(w => {
+            const cell = document.createElement("div");
+            cell.className = "weekday-label";
+            cell.textContent = w;
+            grid.appendChild(cell);
+        });
+
+        for (let i = 0; i < firstDay; i++) {
+            grid.appendChild(document.createElement("div"));
+        }
+        for (let day = 1; day <= lastDay; day++) {
+            const cell = document.createElement("div");
+            cell.textContent = day;
+            grid.appendChild(cell);
+        }
+
+        container.appendChild(grid);
+    }
+
+    function updateHeader(dateStr) {
+        const d = new Date(dateStr + "T00:00:00");
+        document.getElementById("day-number").textContent = d.getDate();
+        document.getElementById("weekday").textContent =
+            d.toLocaleString("default", { weekday: "long" });
+        document.getElementById("month-year").textContent =
+            d.toLocaleString("default", { month: "long", year: "numeric" });
+
+        const y = d.getFullYear();
+        const m = d.getMonth();
+        renderMiniCalendar("mini-current", y, m);
+        renderMiniCalendar("mini-prev", y, m - 1);
+        renderMiniCalendar("mini-next", y, m + 1);
+    }
+
+    /* ==========================================================
+       TASK ROWS
+    ========================================================== */
+
+    function addBlankTask() {
+        const row = document.createElement("div");
+        row.className = "task-row";
+        row.innerHTML = `
+            <input type="checkbox">
+            <select>
+                <option>A</option>
+                <option>B</option>
+                <option>C</option>
+            </select>
+            <input type="text">
+        `;
+        document.getElementById("task-list").appendChild(row);
+    }
+
+    /* ==========================================================
+       LOAD DAY
+    ========================================================== */
+
+    async function loadDay(dateStr) {
+        const res = await fetch("/api/day/" + dateStr);
+        const data = await res.json();
+
+        if (!res.ok) {
+            console.warn("Not loaded:", data.error);
+            return;
+        }
+
+        updateHeader(dateStr);
+
+        // Tasks
+        const list = document.getElementById("task-list");
+        list.innerHTML = "";
+        data.tasks.forEach(t => {
+            const row = document.createElement("div");
+            row.className = "task-row";
+            row.innerHTML = `
+                <input type="checkbox" ${t.checked ? "checked" : ""}>
+                <select>
+                    <option ${t.priority === "A" ? "selected" : ""}>A</option>
+                    <option ${t.priority === "B" ? "selected" : ""}>B</option>
+                    <option ${t.priority === "C" ? "selected" : ""}>C</option>
+                </select>
+                <input type="text" value="${t.description || ""}">
+            `;
+            list.appendChild(row);
+        });
+        if (data.tasks.length === 0) {
+            for (let i = 0; i < 6; i++) addBlankTask();
+        }
+
+        // Appointments
+        const appts = document.querySelectorAll(".appt-row .appt-input");
+        appts.forEach((input, idx) => {
+            const a = data.appointments[idx];
+            input.value = a ? (a.text || "") : "";
+        });
+
+        // Text areas
+        document.getElementById("tracker").value = data.tracker || "";
+        document.getElementById("notes").value = data.notes || "";
+    }
+
+    /* ==========================================================
+       SAVE DAY
+    ========================================================== */
+
+    function collectState() {
+        const dateStr = document.getElementById("date-input").value;
+
+        const tasks = Array.from(document.querySelectorAll("#task-list .task-row"))
+            .map(row => {
+                const checkbox = row.querySelector("input[type=checkbox]");
+                const select = row.querySelector("select");
+                const text = row.querySelector("input[type=text]");
+                return {
+                    checked: checkbox.checked,
+                    priority: select.value,
+                    description: text.value
+                };
+            });
+
+        const appts = Array.from(document.querySelectorAll(".appt-row")).map(r => ({
+            time: r.children[0].textContent.trim(),
+            text: r.querySelector(".appt-input").value
+        }));
+
+        return {
+            date: dateStr,
+            tasks,
+            appointments: appts,
+            tracker: document.getElementById("tracker").value,
+            notes: document.getElementById("notes").value
+        };
+    }
+
+    function saveDayDebounced() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveDay, 500);
+    }
+
+    async function saveDay() {
+        const s = collectState();
+        const res = await fetch("/api/day/" + s.date, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(s)
+        });
+        if (!res.ok) console.warn(await res.text());
+    }
+
+    /* ==========================================================
+       INIT
+    ========================================================== */
+
+    function initEvents() {
+        document.body.addEventListener("input", saveDayDebounced);
+        document.body.addEventListener("change", saveDayDebounced);
+
+        document.getElementById("add-task").addEventListener("click", () => {
+            addBlankTask();
+            saveDayDebounced();
+        });
+
+        document.getElementById("date-input").addEventListener("change", e => {
+            loadDay(e.target.value);
+        });
+
+        document.getElementById("logout-btn").addEventListener("click", async () => {
+            await logout();
+            showAuth();
+        });
+    }
+
+    /* ==========================================================
+       AUTH UI BINDING
+    ========================================================== */
+
+    async function tryLoginOrSignup(action) {
+        const email = document.getElementById("auth-email").value.trim();
+        const password = document.getElementById
   let currentDate = null; // YYYY-MM-DD
   let lastEmailUsed = "";
 
