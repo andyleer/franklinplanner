@@ -1,0 +1,219 @@
+/* styles.css */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.app-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 2rem;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.user-info.hidden {
+  display: none;
+}
+
+button {
+  padding: 0.35rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+button.primary {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
+button:hover {
+  opacity: 0.95;
+}
+
+/* Cards / Sections */
+
+.card {
+  background: #ffffff;
+  padding: 1rem 1.25rem;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 1rem;
+}
+
+.hidden {
+  display: none;
+}
+
+/* Auth */
+
+.auth-forms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.auth-forms form {
+  flex: 1 1 240px;
+  min-width: 240px;
+}
+
+.auth-forms label {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
+.auth-forms input {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  margin-bottom: 0.6rem;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+  margin: 0 0.5rem;
+}
+
+.error-msg {
+  color: #b91c1c;
+  font-size: 0.85rem;
+}
+
+/* Planner */
+
+.planner {
+  background: #ffffff;
+  padding: 1rem 1.25rem 1.5rem;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.planner-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.date-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.date-picker input[type="date"] {
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+}
+
+.save-status {
+  font-size: 0.85rem;
+  color: #16a34a;
+}
+
+.save-status.error-msg {
+  color: #b91c1c;
+}
+
+/* Body */
+
+.planner-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.planner-body .column {
+  flex: 1 1 320px;
+  min-width: 320px;
+}
+
+.planner-body h2 {
+  margin-top: 0.25rem;
+  margin-bottom: 0.4rem;
+  font-size: 1rem;
+}
+
+/* Tables */
+
+.tasks-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.tasks-table th,
+.tasks-table td {
+  border: 1px solid #e5e7eb;
+  padding: 0.3rem 0.4rem;
+}
+
+.tasks-table th {
+  background: #f9fafb;
+  text-align: left;
+}
+
+.tasks-table input[type="text"],
+.tasks-table input[type="time"],
+.tasks-table select {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+  padding: 0.2rem 0.3rem;
+  font-size: 0.85rem;
+}
+
+/* Textareas */
+
+textarea {
+  width: 100%;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.9rem;
+  resize: vertical;
+}
