@@ -1,39 +1,279 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Franklin Planner</title>
-  <link rel="stylesheet" href="styles.css" />
+<meta charset="UTF-8" />
+<title>Franklin Planner</title>
+
+<style>
+/* ------------------------------------------------------
+   GLOBAL
+------------------------------------------------------ */
+body {
+    background: #f5f7f6;
+    font-family: "Franklin Gothic Medium", Arial, sans-serif;
+    color: #003b3b;
+    margin: 0;
+}
+.hidden { display: none; }
+
+/* ------------------------------------------------------
+   AUTH UI
+------------------------------------------------------ */
+#auth-container {
+    max-width: 360px;
+    margin: 60px auto;
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #c4d1ce;
+}
+#auth-container h2 {
+    margin-top: 0;
+    text-align: center;
+}
+.auth-input {
+    width: 100%;
+    padding: 8px;
+    margin: 6px 0;
+    font-size: 1rem;
+    border-radius: 4px;
+    border: 1px solid #aaa;
+}
+.auth-btn {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    background: #0a5252;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 1rem;
+    cursor: pointer;
+}
+.auth-btn:hover { background: #0d6b6b; }
+#auth-error {
+    color: red;
+    text-align: center;
+    margin-top: 8px;
+}
+
+/* ------------------------------------------------------
+   PLANNER LAYOUT
+------------------------------------------------------ */
+#planner-container.hidden { display: none; }
+
+.controls {
+    text-align: center;
+    padding: 10px;
+}
+
+.spread {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.page {
+    width: 540px;
+    height: 750px;
+    background: #e9f1f0;
+    border: 1px solid #cad7d5;
+    border-radius: 6px;
+    padding: 1.25rem 1.75rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+}
+
+.page-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.4rem;
+}
+
+/* DATE */
+.date-row { display: flex; gap: 0.7rem; }
+.day-number { font-size: 2.6rem; font-weight: 700; }
+.weekday { text-transform: uppercase; font-size: .9rem; }
+.month-year { font-size: .8rem; text-transform: uppercase; color: #366; }
+
+/* MINI CAL */
+.mini-calendar-small, #mini-current {
+    border: 1px solid #c4d1ce;
+    padding: .3rem;
+    background: white;
+    border-radius: 4px;
+    font-size: .65rem;
+}
+.mini-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+}
+.weekday-label { font-weight: bold; }
+
+/* SECTION HEADERS */
+.section-title {
+    border-bottom: 1.5px solid #003b3b;
+    padding-bottom: 4px;
+    margin-top: 14px;
+    margin-bottom: 6px;
+    font-size: .75rem;
+    letter-spacing: 0.08em;
+}
+
+/* TASK LIST */
+.task-row {
+    display: grid;
+    grid-template-columns: 20px 35px auto;
+    padding: 4px 0;
+    border-bottom: 1px solid #c9d6d5;
+}
+.task-row select,
+.task-row input[type=text] {
+    font-size: .8rem;
+    border: none;
+    background: transparent;
+}
+.task-row input[type=text]:focus { outline: none; }
+
+.add-task-btn {
+    padding: 4px 6px;
+    font-size: .75rem;
+    border: 1px solid #366;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+/* APPOINTMENTS */
+.appt-row {
+    display: grid;
+    grid-template-columns: 40px auto;
+    border-bottom: 1px solid #cbd6d6;
+    padding: 3px 0;
+}
+.appt-input {
+    border: none;
+    background: transparent;
+    font-size: .8rem;
+}
+.appt-input:focus { outline: none; }
+
+/* TRACKER + NOTES */
+.tracker-textarea, .notes-textarea {
+    width: 100%;
+    height: 180px;
+    border: none;
+    background: repeating-linear-gradient(
+        to bottom,
+        #fff 0,
+        #fff 18px,
+        #ccc 19px,
+        #fff 20px
+    );
+    font-size: .85rem;
+    padding: 6px;
+}
+.notes-textarea { height: 600px; }
+</style>
 </head>
 <body>
-  <div class="app-shell">
-    <header>
-      <h1>Franklin-Style Daily Planner</h1>
-      <div id="user-info" class="user-info">
-        <span id="user-email"></span>
-        <button id="logout-btn" type="button">Log Out</button>
-      </div>
-    </header>
 
-    <!-- AUTH PANEL -->
-    <section id="auth-section" class="card">
-      <h2>Log In</h2>
-      <div class="auth-forms">
-        <form id="login-form">
-          <label>
-            Email
-            <input type="email" id="login-email" required />
-          </label>
-          <label>
-            Password
-            <input type="password" id="login-password" required />
-          </label>
-          <button type="submit">Log In</button>
-        </form>
+<!-- ------------------------------------------------------
+     LOGIN / SIGNUP PANEL
+------------------------------------------------------ -->
+<div id="auth-container">
+    <h2>Login</h2>
+    <input id="auth-email" class="auth-input" placeholder="Email">
+    <input id="auth-password" class="auth-input" placeholder="Password" type="password">
+    <button id="login-btn" class="auth-btn">Login</button>
+    <button id="signup-btn" class="auth-btn">Create Account</button>
+    <div id="auth-error"></div>
+</div>
 
-        <div class="divider">
-          <span>or</span>
+<!-- ------------------------------------------------------
+     PLANNER UI
+------------------------------------------------------ -->
+<div id="planner-container" class="hidden">
+
+<div class="controls">
+    <button id="logout-btn">Logout</button>
+</div>
+
+<div class="spread">
+
+    <!-- LEFT PAGE -->
+    <div class="page">
+        <div class="page-body">
+
+            <!-- LEFT COLUMN -->
+            <div>
+                <div class="date-row">
+                    <div class="day-number" id="day-number"></div>
+                    <div>
+                        <div class="weekday" id="weekday"></div>
+                        <div class="month-year" id="month-year"></div>
+                        <label style="font-size:.75rem">
+                            Date:
+                            <input id="date-input" type="date">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mini-calendar-small" id="mini-prev"></div>
+
+                <div class="section-title">ABC PRIORITIZED DAILY TASK LIST</div>
+                <div id="task-list"></div>
+                <button id="add-task" class="add-task-btn">+ Add Task</button>
+
+                <div class="section-title">DAILY TRACKER</div>
+                <textarea id="tracker" class="tracker-textarea"></textarea>
+            </div>
+
+            <!-- RIGHT COLUMN -->
+            <div>
+                <div id="mini-current"></div>
+                <div class="mini-calendar-small" id="mini-next"></div>
+
+                <div class="section-title">APPOINTMENT SCHEDULE</div>
+                <div id="appt-list">
+                    <!-- Times fixed -->
+                    <div class="appt-row"><div>7</div><input class="appt-input"></div>
+                    <div class="appt-row"><div>8</div><input class="appt-input"></div>
+                    <div class="appt-row"><div>9</div><input class="appt-input"></div>
+                    <div class="appt-row"><div>10</div><input class="appt-input"></div>
+                    <div class="appt-row"><div>11</div><input class="appt-input"></div>
+                    <div class="appt-row"><div>12</div><input class="appt-input"></div>
+                    <div class="appt-row"><div>1</div><input class="appt-input"></div>
+                    <div class="appt-row"><div>2</div><input class="appt-input"></div>
+                    <div class="appt-row"><div>3</div><input class="appt-input"></div>
+                    <div class="appt-row"><div>4</div><input class="appt-input"></div>
+                    <div class="appt-row"><div>5</div><input class="appt-input"></div>
+                    <div class="appt-row"><div>6</div><input class="appt-input"></div>
+                    <div class="appt-row"><div>7</div><input class="appt-input"></div>
+                    <div class="appt-row"><div>8</div><input class="appt-input"></div>
+                </div>
+            </div>
+
         </div>
+    </div>
+
+    <!-- RIGHT PAGE: Notes -->
+    <div class="page">
+        <div class="section-title">NOTES</div>
+        <textarea id="notes" class="notes-textarea"></textarea>
+    </div>
+
+</div>
+
+</div><!-- planner-container -->
+
+<script src="planner.js"></script>
+
+</body>
+</html>
 
         <form id="signup-form">
           <h3>Create an Account</h3>
